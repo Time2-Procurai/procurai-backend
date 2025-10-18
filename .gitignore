@@ -2,3 +2,6 @@
 # Python
 __pycache__/
 *.pyc
+
+# Arquivos do PyCharm
+/.idea/
