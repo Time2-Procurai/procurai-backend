@@ -1,13 +1,14 @@
 from django.urls import path
-# Importamos as novas views baseadas em classes
-from .views import ClienteCreateView, LojistaCreateView
+from .views import Tela1UserRegistrationView, Tela2LojistaProfileView, Tela3LojistaEnderecoView
 
 app_name = 'user'
 
 urlpatterns = [
-    # Rota para o cadastro de cliente
-    path('cadastro/cliente/', ClienteCreateView.as_view(), name='cadastro-cliente'),
+    path('register/tela1/', Tela1UserRegistrationView.as_view(), name='register-tela1'),
 
-    # Rota para o cadastro de lojista
-    path('cadastro/lojista/', LojistaCreateView.as_view(), name='cadastro-lojista'),
+    path('register/tela2/lojista/<int:user_id>/', Tela2LojistaProfileView.as_view(), name='register-tela2'),
+
+    path('register/tela3/lojista/<int:user_id>/', Tela3LojistaEnderecoView.as_view(),name='register-step3-lojista'
+    ),
 ]
+

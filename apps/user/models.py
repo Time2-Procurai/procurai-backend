@@ -7,7 +7,7 @@ class User(AbstractUser):
     # Campos com caracteísiticas comuns aos dois tipos de usuário
     full_name = models.CharField(max_length=255, verbose_name='Nome Completo')
     email = models.EmailField(unique=True, verbose_name='E-mail')
-    cpf = models.CharField(max_length=11, unique=True, verbose_name='CPF')
+    cpf = models.CharField(max_length=11, unique=True, verbose_name='CPF', blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True, null=True, verbose_name='Telefone')
 
     # Campos para identificar se o usuário é Lojista ou Cliente
@@ -45,9 +45,15 @@ class ClienteProfile(models.Model):
 class LojistaProfile(models.Model):
     TIPO_EMPRESA = [('TECH', 'Tecnologia'), ('FOOD', 'Alimentação')]
     # Confirmar a questão da ctegoria
-    CATEGORIA_EMPRESA = [('PEQ','Pequena')]
+    CATEGORIA_EMPRESA = [('ROUP', 'Roupas e Acessórios'),
+        ('ELET', 'Eletrônicos'),
+        ('COSM', 'Cosméticos'),
+        ('REST', 'Restaurantes')]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='lojista_profile')
+
+    profile_picture = models.ImageField(upload_to='lojistas/profile_pics', null=True, blank=True, verbose_name='Foto de Perfil')
+    cover_picture = models.ImageField(upload_to='lojistas/cover_pics', null=True, blank=True, verbose_name='Foto de Capa')
 
     company_name = models.CharField(max_length=255, verbose_name="Nome da Empresa")
     cnpj = models.CharField(max_length=18, unique=True, blank=True, null=True, verbose_name="CNPJ")
