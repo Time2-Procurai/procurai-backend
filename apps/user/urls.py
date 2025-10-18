@@ -1,7 +1,13 @@
 from django.urls import path
-from . import views
+# Importamos as novas views baseadas em classes
+from .views import ClienteCreateView, LojistaCreateView
+
+app_name = 'user'
 
 urlpatterns = [
-    path('clientes/', views.retornar_clientes, name='retornar_clientes'),
-    path('clientes/criar/', views.criar_cliente, name='criar_cliente'),
+    # Rota para o cadastro de cliente
+    path('cadastro/cliente/', ClienteCreateView.as_view(), name='cadastro-cliente'),
+
+    # Rota para o cadastro de lojista
+    path('cadastro/lojista/', LojistaCreateView.as_view(), name='cadastro-lojista'),
 ]

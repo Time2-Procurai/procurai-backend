@@ -1,61 +1,67 @@
+from django.contrib.auth.models import AbstractUser
 from django.db import models
 
-class Lojista(models.Model):
-    
-    TIPO_EMPRESA = [
-        ('TECH','Tecnologia'),
-        ('FOOD','Alimentação'),
-    ]
-    
-    CATEGORIA_EMPRESA = [
-        ('PEQ','Pequena'),
-        ('MED','Média'),
-        ('GRD','Grande'),
-    ]
-    
-    nome = models.CharField(max_length=100, null=False)
-    username = models.CharField(max_length=80, unique=True, null=False)
-    senha = models.CharField(max_length=128, null=False)
-    email = models.EmailField(unique=True, null=False)
-    cpf = models.CharField(max_length=11, unique=True, null=False)
-    cnpj = models.CharField(max_length=14, unique=True, null=False)
-    tipo = models.CharField(max_length=50, choices=TIPO_EMPRESA, null=False)
-    categoria = models.CharField(max_length=50, choices=CATEGORIA_EMPRESA, null=False)
-    foto = models.ImageField(upload_to='fotos_lojas/', blank=True, null=True)
-    telefone = models.CharField(max_length=15, blank=True, null=True)
-    cep = models.CharField(max_length=8, blank=True, null=True)
-    numero = models.IntegerField(blank=True, null=True)
-    cidade = models.CharField(max_length=100, blank=True, null=True)
-    estado = models.CharField(max_length=100, blank=True, null=True)
-    bairro = models.CharField(max_length=100, blank=True, null=True)
-    complemento = models.CharField(max_length=100, blank=True, null=True)
-    endereco = models.TextField(blank=True, null=True)
-    descricao = models.TextField(blank=True, null=True)
+
+class User(AbstractUser):
+
+    # Campos com caracteísiticas comuns aos dois tipos de usuário
+    full_name = models.CharField(max_length=255, verbose_name='Nome Completo')
+    email = models.EmailField(unique=True, verbose_name='E-mail')
+    cpf = models.CharField(max_length=11, unique=True, verbose_name='CPF')
+    phone = models.CharField(max_length=20, blank=True, null=True, verbose_name='Telefone')
+
+    # Campos para identificar se o usuário é Lojista ou Cliente
+    is_lojista = models.BooleanField(default=False)
+    is_cliente = models.BooleanField(default=False)
+
+    # Definindo que 'email' será usado para login
+    USERNAME_FIELD = 'email'
+
+    REQUIRED_FIELDS = ['username', 'full_name' ,'cpf']
 
     def __str__(self):
-        return self.nome
+        return self.email
 
-class Cliente(models.Model):
-    
-    # 1. Corrigido o formato de INTERESSES para uma lista de tuplas (valor_banco, valor_legivel)
+class ClienteProfile(models.Model):
     INTERESSES_CHOICES = [
         ('CON', 'Construção'),
         ('SAU', 'Saúde'),
         ('ELE', 'Eletrônicos'),
     ]
-    
-    nome = models.CharField(max_length=100, null=False)
-    username = models.CharField(max_length=80, unique=True, null=False)
-    email = models.EmailField(unique=True, null=False)
-    cpf = models.CharField(max_length=11, unique=True, null=False)
-    foto = models.ImageField(upload_to='fotos_clientes/', blank=True, null=True)
-    telefone = models.CharField(max_length=15, blank=True, null=True)
-    endereco = models.TextField(blank=True, null=True)
-    senha = models.CharField(max_length=128, null=False)  # Adicionado campo de senha
-    
-    # 2. O campo agora usa a lista de tuplas corrigida
-    interesses = models.CharField(max_length=3, choices=INTERESSES_CHOICES, blank=True, null=True)
 
-    # 3. Método __str__ melhorado para ser mais seguro e prático
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='cliente_profile')
+
+    interesses = models.CharField(
+        max_length=3,
+        choices=INTERESSES_CHOICES,
+        blank=True,
+        null=True,
+        verbose_name="Interesses"
+    )
+
     def __str__(self):
-        return f"{self.nome} ({self.username})"
+        return f"Perfil de Cliente de {self.user.username}"
+
+class LojistaProfile(models.Model):
+    TIPO_EMPRESA = [('TECH', 'Tecnologia'), ('FOOD', 'Alimentação')]
+    # Confirmar a questão da ctegoria
+    CATEGORIA_EMPRESA = [('PEQ','Pequena')]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='lojista_profile')
+
+    company_name = models.CharField(max_length=255, verbose_name="Nome da Empresa")
+    cnpj = models.CharField(max_length=18, unique=True, blank=True, null=True, verbose_name="CNPJ")
+    company_type = models.CharField(max_length=50, choices=TIPO_EMPRESA, verbose_name="Tipo da Empresa")
+    company_category = models.CharField(max_length=50, choices=CATEGORIA_EMPRESA, verbose_name="Categoria da Empresa")
+    description = models.TextField(blank=True, null=True, verbose_name="Descrição da Empresa")
+    operating_hours = models.CharField(max_length=100, blank=True, null=True, verbose_name="Horário de Funcionamento")
+
+    cep = models.CharField(max_length=9, blank=True, null=True, verbose_name="CEP")
+    street = models.CharField(max_length=255, blank=True, null=True, verbose_name="Rua/Avenida")
+    number = models.CharField(max_length=20, blank=True, null=True, verbose_name="Número")
+    neighborhood = models.CharField(max_length=100, blank=True, null=True, verbose_name="Bairro")
+    city = models.CharField(max_length=100, blank=True, null=True, verbose_name="Cidade")
+    complement = models.CharField(max_length=100, blank=True, null=True, verbose_name="Complemento")
+
+    def __str__(self):
+        return f"Perfil de Lojista de {self.company_name}"

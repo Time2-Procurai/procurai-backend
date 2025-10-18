@@ -1,21 +1,13 @@
-from .models import Cliente
-from django.shortcuts import render,redirect,get_object_or_404
-from rest_framework.decorators import api_view
-from .forms import ClienteForm
-from rest_framework.response import Response
-from .serializers import ClienteSerializer
+from rest_framework import generics
+from .models import User
+from .serializers import ClienteCreateSerializer, LojistaCreateSerializer
 
-@api_view(['POST'])
-def criar_cliente(request):
-    serializer = ClienteSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=201)
-    return Response(serializer.errors, status=400)      
-           
+# Endpoint para CRIAR um novo Cliente
+class ClienteCreateView(generics.CreateAPIView):
+    queryset = User.objects.filter(is_cliente=True)
+    serializer_class = ClienteCreateSerializer
 
-@api_view(['GET'])
-def retornar_clientes(request):
-    clientes = Cliente.objects.all()
-    serializer = ClienteSerializer(clientes, many=True)
-    return Response(serializer.data)
+# Endpoint para CRIAR um novo Lojista (já vamos deixar pronto)
+class LojistaCreateView(generics.CreateAPIView):
+    queryset = User.objects.filter(is_lojista=True)
+    serializer_class = LojistaCreateSerializer
