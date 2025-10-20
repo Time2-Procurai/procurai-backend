@@ -126,4 +126,8 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+<<<<<<< HEAD
 AUTH_USER_MODEL = 'user.User'
+=======
+AUTH_USER_MODEL = 'user.User'
+>>>>>>> dcf8ff9e5f7260a29d806f5a65faa73cf2608609

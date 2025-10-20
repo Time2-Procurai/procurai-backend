@@ -1,3 +1,100 @@
+<<<<<<< HEAD
+from .models import ClienteProfile
+from django.shortcuts import render,redirect,get_object_or_404
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import generics, status
+
+from rest_framework.permissions import AllowAny,IsAuthenticated
+
+from django.shortcuts import get_object_or_404
+from .models import User, LojistaProfile
+from .serializers.profile import ClienteProfileSerializer
+from .serializers.profile import Tela3LojistaEnderecoSerealizer
+from .serializers.profile import Tela2LojistaSerializer
+from .serializers.registration import Tela1UserCreationSerializer
+from .serializers.deleteUser import ConfirmDeleteSerializer
+from apps.user.serializers.deleteUser import UserBasicSerializer
+
+class ClienteProfileRegistrationView(generics.CreateAPIView):
+    """
+    Endpoint da API para a Etapa 2 do cadastro de Cliente.
+    Recebe um user_id na URL para saber a qual usuário associar o perfil.
+    """
+    queryset = ClienteProfile.objects.all()
+    serializer_class = ClienteProfileSerializer
+    permission_classes = [AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        # PONTO CRÍTICO 1: Estamos pegando o 'user_id' que vem da URL.
+        user_id = self.kwargs.get('user_id')
+
+        # PONTO CRÍTICO 2: Estamos buscando o usuário no banco de dados com esse ID.
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "Usuário com o ID fornecido não foi encontrado."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Verificação extra: impede a criação de um segundo perfil para o mesmo usuário.
+        if hasattr(user, 'cliente_profile'):
+            return Response(
+                {"error": "Este usuário já possui um perfil de cliente."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # PONTO CRÍTICO 3: Estamos passando o objeto 'user' que encontramos para o serializer.
+        serializer = self.get_serializer(
+            data=request.data,
+            context={'user': user}
+        )
+        
+        serializer.is_valid(raise_exception=True)
+        cliente_profile = serializer.save()
+        
+        return Response(
+            {
+                "message": "Cadastro de cliente finalizado com sucesso!",
+                "user_id": cliente_profile.user.id,
+                "profile_id": cliente_profile.id
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+
+class DeletarContaView(generics.GenericAPIView):
+    """
+    Recebe POST com email+senha para confirmar exclusão.
+    Requer que o cliente já esteja autenticado (token/JWT) e que as credenciais
+    fornecidas correspondam ao mesmo usuário autenticado.
+    """
+    # permission_classes = [IsAuthenticated] 
+    serializer_class = ConfirmDeleteSerializer
+
+    def perform_destroy(self, instance):
+        # se precisar remover arquivos, faça aqui antes de instance.delete()
+        instance.delete()
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+
+        # if request.user != user:
+        #     return Response(
+        #         {"detail": "As credenciais não correspondem ao usuário autenticado."},
+        #         status=status.HTTP_403_FORBIDDEN
+        #     )
+
+        user_data = UserBasicSerializer(user).data
+        self.perform_destroy(user)
+        return Response(
+            {"message": "Conta apagada com sucesso", "user": user_data},
+            status=status.HTTP_200_OK
+        )
+=======
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -8,6 +105,7 @@ from .models import User, LojistaProfile
 from .serializers.profile import Tela3LojistaEnderecoSerealizer
 from .serializers.profile import Tela2LojistaSerializer
 from .serializers.registration import Tela1UserCreationSerializer
+>>>>>>> dcf8ff9e5f7260a29d806f5a65faa73cf2608609
 
 class Tela1UserRegistrationView(generics.CreateAPIView):
     """
@@ -37,6 +135,11 @@ class Tela1UserRegistrationView(generics.CreateAPIView):
             },
             status=status.HTTP_201_CREATED
         )
+<<<<<<< HEAD
+        
+
+=======
+>>>>>>> dcf8ff9e5f7260a29d806f5a65faa73cf2608609
 
 class Tela2LojistaProfileView(generics.CreateAPIView):
     """
@@ -89,4 +192,8 @@ class Tela3LojistaEnderecoView(generics.UpdateAPIView):
             )
 
         return Response
+<<<<<<< HEAD
+    
+=======
 
+>>>>>>> dcf8ff9e5f7260a29d806f5a65faa73cf2608609
