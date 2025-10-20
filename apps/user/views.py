@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from .models import ClienteProfile
 from django.shortcuts import render,redirect,get_object_or_404
 from rest_framework.decorators import api_view
@@ -93,6 +94,18 @@ class DeletarContaView(generics.GenericAPIView):
             {"message": "Conta apagada com sucesso", "user": user_data},
             status=status.HTTP_200_OK
         )
+=======
+from rest_framework import generics, status
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
+
+from django.shortcuts import get_object_or_404
+from .models import User, LojistaProfile
+
+from .serializers.profile import Tela3LojistaEnderecoSerealizer
+from .serializers.profile import Tela2LojistaSerializer
+from .serializers.registration import Tela1UserCreationSerializer
+>>>>>>> dcf8ff9e5f7260a29d806f5a65faa73cf2608609
 
 class Tela1UserRegistrationView(generics.CreateAPIView):
     """
@@ -122,8 +135,11 @@ class Tela1UserRegistrationView(generics.CreateAPIView):
             },
             status=status.HTTP_201_CREATED
         )
+<<<<<<< HEAD
         
 
+=======
+>>>>>>> dcf8ff9e5f7260a29d806f5a65faa73cf2608609
 
 class Tela2LojistaProfileView(generics.CreateAPIView):
     """
@@ -176,4 +192,8 @@ class Tela3LojistaEnderecoView(generics.UpdateAPIView):
             )
 
         return Response
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> dcf8ff9e5f7260a29d806f5a65faa73cf2608609

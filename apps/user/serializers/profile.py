@@ -1,4 +1,5 @@
 from rest_framework import serializers
+<<<<<<< HEAD
 from ..models import LojistaProfile,ClienteProfile
 
 
@@ -40,6 +41,9 @@ class ClienteProfileSerializer(serializers.ModelSerializer):
     
      
 
+=======
+from ..models import LojistaProfile
+>>>>>>> dcf8ff9e5f7260a29d806f5a65faa73cf2608609
 
 class Tela2LojistaSerializer(serializers.ModelSerializer):
     """
@@ -85,4 +89,9 @@ class Tela2LojistaSerializer(serializers.ModelSerializer):
 class Tela3LojistaEnderecoSerealizer(serializers.ModelSerializer):
     class Meta:
         model = LojistaProfile
+<<<<<<< HEAD
         fields = ['cep', 'street', 'number', 'neighborhood', 'city', 'complement']
+=======
+        fields = ['cep', 'street', 'number', 'neighborhood', 'city', 'complement']
+
+>>>>>>> dcf8ff9e5f7260a29d806f5a65faa73cf2608609

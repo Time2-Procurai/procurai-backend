@@ -25,6 +25,9 @@ venv.bak/
 .vscode/
 *.sublime-*
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> dcf8ff9e5f7260a29d806f5a65faa73cf2608609
 # Arquivos do PyCharm
 /.idea/
