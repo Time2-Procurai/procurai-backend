@@ -4,6 +4,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.permissions import IsAuthenticated
 
 from django.shortcuts import get_object_or_404
+from django.db import transaction
+import os
 
 from apps.user.serializers.deleteUser import UserBasicSerializer
 from .models import User, LojistaProfile
@@ -97,15 +99,31 @@ class Tela3LojistaEnderecoView(generics.UpdateAPIView):
 
 class DeletarContaView(generics.GenericAPIView):
     """
-    Recebe POST com email+senha para confirmar exclusão.
-    Requer que o cliente já esteja autenticado (token/JWT) e que as credenciais
-    fornecidas correspondam ao mesmo usuário autenticado.
+    POST com email+senha para confirmar exclusão.
+    Para testes locais permission_classes pode ficar vazio; em produção use IsAuthenticated
+    e compare request.user com o usuário autenticado.
     """
-    # permission_classes = [IsAuthenticated] 
+    # permission_classes = [IsAuthenticated]
     serializer_class = ConfirmDeleteSerializer
 
+    def _delete_lojista_files(self, lojista):
+        for f in (lojista.profile_picture, lojista.cover_picture):
+            try:
+                if f and hasattr(f, 'path') and os.path.isfile(f.path):
+                    os.remove(f.path)
+            except Exception:
+                pass
+
     def perform_destroy(self, instance):
-        # se precisar remover arquivos, faça aqui antes de instance.delete()
+        # remover dados relacionados de acordo com o tipo
+        if hasattr(instance, 'lojista_profile'):
+            loj = instance.lojista_profile
+            self._delete_lojista_files(loj)
+            loj.delete()
+            # aqui: opcionalmente apagar produtos, avaliações, etc.
+        if hasattr(instance, 'cliente_profile'):
+            instance.cliente_profile.delete()
+        # por fim, apagar o usuário
         instance.delete()
 
     def post(self, request, *args, **kwargs):
@@ -113,15 +131,20 @@ class DeletarContaView(generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
 
+        # Se em produção: garantir que o requester seja o próprio usuário autenticado
         # if request.user != user:
-        #     return Response(
-        #         {"detail": "As credenciais não correspondem ao usuário autenticado."},
-        #         status=status.HTTP_403_FORBIDDEN
-        #     )
+        #     return Response({"detail": "Credenciais não correspondem ao usuário autenticado."},
+        #                     status=status.HTTP_403_FORBIDDEN)
 
-        user_data = UserBasicSerializer(user).data
-        self.perform_destroy(user)
-        return Response(
-            {"message": "Conta apagada com sucesso", "user": user_data},
-            status=status.HTTP_200_OK
-        )
+        # Regras de negócio específicas
+        if getattr(user, 'is_lojista', False):
+            # Exemplo: impedir exclusão se houver pedidos pendentes
+            # if user_has_pending_orders(user):
+            #     return Response({"detail": "Existem pedidos pendentes."}, status=status.HTTP_400_BAD_REQUEST)
+            pass
+
+        with transaction.atomic():
+            user_data = UserBasicSerializer(user).data
+            self.perform_destroy(user)
+
+        return Response({"message": "Conta apagada com sucesso", "user": user_data}, status=status.HTTP_200_OK)
