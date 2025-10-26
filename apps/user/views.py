@@ -5,11 +5,11 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import generics, status
 
-from rest_framework.permissions import AllowAny,IsAuthenticated
+from rest_framework.permissions import AllowAny,IsAuthenticated,IsAdminUser
 
 from django.shortcuts import get_object_or_404
 from .models import User, LojistaProfile
-from .serializers.profile import ClienteProfileSerializer
+from .serializers.profile import ClienteProfileSerializer,UserListSerializer
 from .serializers.profile import Tela3LojistaEnderecoSerealizer
 from .serializers.profile import Tela2LojistaSerializer
 from .serializers.registration import Tela1UserCreationSerializer
@@ -175,3 +175,14 @@ class Tela3LojistaEnderecoView(generics.UpdateAPIView):
             )
 
         return Response
+
+class UserListView(generics.ListAPIView):
+    """
+    Endpoint da API para listar todos os usuários cadastrados.
+    Retorna apenas ID e Email.
+    """
+    queryset = User.objects.all()    
+   
+    serializer_class = UserListSerializer 
+    
+   
