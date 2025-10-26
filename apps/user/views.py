@@ -15,6 +15,8 @@ from .serializers.profile import Tela2LojistaSerializer
 from .serializers.registration import Tela1UserCreationSerializer
 from .serializers.deleteUser import ConfirmDeleteSerializer
 from apps.user.serializers.deleteUser import UserBasicSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers.serializers import MyTokenObtainPairViewSerializer
 
 class ClienteProfileRegistrationView(generics.CreateAPIView):
     """
@@ -26,10 +28,7 @@ class ClienteProfileRegistrationView(generics.CreateAPIView):
     permission_classes = [AllowAny]
 
     def create(self, request, *args, **kwargs):
-        # PONTO CRÍTICO 1: Estamos pegando o 'user_id' que vem da URL.
         user_id = self.kwargs.get('user_id')
-
-        # PONTO CRÍTICO 2: Estamos buscando o usuário no banco de dados com esse ID.
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
@@ -38,21 +37,19 @@ class ClienteProfileRegistrationView(generics.CreateAPIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Verificação extra: impede a criação de um segundo perfil para o mesmo usuário.
         if hasattr(user, 'cliente_profile'):
             return Response(
                 {"error": "Este usuário já possui um perfil de cliente."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # PONTO CRÍTICO 3: Estamos passando o objeto 'user' que encontramos para o serializer.
-        serializer = self.get_serializer(
-            data=request.data,
-            context={'user': user}
-        )
-        
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        cliente_profile = serializer.save()
+        
+    
+        # Em vez de: cliente_profile = serializer.save()
+        # Diga ao save() qual usuário ele deve associar:
+        cliente_profile = serializer.save(user=user)
         
         return Response(
             {
@@ -175,3 +172,14 @@ class Tela3LojistaEnderecoView(generics.UpdateAPIView):
             )
 
         return Response
+    
+
+    # ... (no final do arquivo, depois de Tela3LojistaEnderecoView)
+
+class MyTokenObtainPairView(TokenObtainPairView):
+    """
+    Endpoint de Login.
+    Recebe 'email' e 'password', retorna 'access' e 'refresh' tokens.
+    O 'access' token conterá o 'role' (cliente/lojista).
+    """
+    serializer_class = MyTokenObtainPairViewSerializer
