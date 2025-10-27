@@ -13,7 +13,6 @@ from .serializers.profile import ClienteProfileSerializer
 from .serializers.profile import Tela3LojistaEnderecoSerealizer
 from .serializers.profile import Tela2LojistaSerializer
 from .serializers.registration import Tela1UserCreationSerializer
-from .serializers.deleteUser import ConfirmDeleteSerializer
 from apps.user.serializers.deleteUser import UserBasicSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers.serializers import MyTokenObtainPairViewSerializer
@@ -63,33 +62,34 @@ class ClienteProfileRegistrationView(generics.CreateAPIView):
 
 class DeletarContaView(generics.GenericAPIView):
     """
-    Recebe POST com email+senha para confirmar exclusão.
-    Requer que o cliente já esteja autenticado (token/JWT) e que as credenciais
-    fornecidas correspondam ao mesmo usuário autenticado.
+    Recebe uma requisição DELETE autenticada (via token/JWT)
+    e deleta o usuário que fez a requisição (request.user).
     """
-    # permission_classes = [IsAuthenticated] 
-    serializer_class = ConfirmDeleteSerializer
-
+    
+   
+    permission_classes = [IsAuthenticated] 
+    
+   
     def perform_destroy(self, instance):
-        # se precisar remover arquivos, faça aqui antes de instance.delete()
+       
         instance.delete()
 
-    def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data['user']
+    def delete(self, request, *args, **kwargs):
+        
+        # 4. 'request.user' é o usuário identificado pelo token.
+        # Esta é a "sessão" que você mencionou.
+        user_to_delete = request.user 
 
-        # if request.user != user:
-        #     return Response(
-        #         {"detail": "As credenciais não correspondem ao usuário autenticado."},
-        #         status=status.HTTP_403_FORBIDDEN
-        #     )
-
-        user_data = UserBasicSerializer(user).data
-        self.perform_destroy(user)
+        # (Opcional) Salva os dados do usuário para a resposta
+        user_data = UserBasicSerializer(user_to_delete).data
+        
+        # 5. Deleta o usuário
+        self.perform_destroy(user_to_delete)
+        
         return Response(
             {"message": "Conta apagada com sucesso", "user": user_data},
             status=status.HTTP_200_OK
+           
         )
 
 class Tela1UserRegistrationView(generics.CreateAPIView):
