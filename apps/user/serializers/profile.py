@@ -1,5 +1,45 @@
 from rest_framework import serializers
-from ..models import LojistaProfile
+from ..models import LojistaProfile,ClienteProfile
+
+
+class ClienteProfileSerializer(serializers.ModelSerializer):
+    """
+    Serializer para o perfil do cliente, incluindo dados do usuário associado.
+    """
+    full_name = serializers.CharField(write_only=True, max_length=255)
+    cpf = serializers.CharField(write_only=True, max_length=11)
+    phone = serializers.CharField(write_only=True, max_length=20, required=False, allow_blank=True)
+
+    class Meta:
+        model = ClienteProfile       
+        fields = ['interesses', 'full_name', 'cpf', 'phone']
+
+    def update(self, instance, validated_data):
+        pass
+
+    def create(self, validated_data):
+                
+        user = self.context['user']
+              
+        user_data = {
+            'full_name': validated_data.pop('full_name'),
+            'cpf': validated_data.pop('cpf'),
+            'phone': validated_data.pop('phone'),
+        }
+
+       
+        for attr, value in user_data.items():
+            setattr(user, attr, value)
+        user.save()
+
+        cliente_profile = ClienteProfile.objects.create(user=user, **validated_data)
+
+        return cliente_profile
+        
+    
+    
+     
+
 
 class Tela2LojistaSerializer(serializers.ModelSerializer):
     """

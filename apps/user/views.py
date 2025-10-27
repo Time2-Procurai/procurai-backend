@@ -1,7 +1,11 @@
-from rest_framework import generics, status
+
+from .models import ClienteProfile
+from django.shortcuts import render,redirect,get_object_or_404
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import generics, status
+
+from rest_framework.permissions import AllowAny,IsAuthenticated
 
 from django.shortcuts import get_object_or_404
 from django.db import transaction
@@ -9,12 +13,88 @@ import os
 
 from apps.user.serializers.deleteUser import UserBasicSerializer
 from .models import User, LojistaProfile
-
+from .serializers.profile import ClienteProfileSerializer
 from .serializers.profile import Tela3LojistaEnderecoSerealizer
 from .serializers.profile import Tela2LojistaSerializer
 from .serializers.registration import Tela1UserCreationSerializer
-from .serializers.deleteUser import ConfirmDeleteSerializer
+from apps.user.serializers.deleteUser import UserBasicSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers.serializers import MyTokenObtainPairViewSerializer
 
+class ClienteProfileRegistrationView(generics.CreateAPIView):
+    """
+    Endpoint da API para a Etapa 2 do cadastro de Cliente.
+    Recebe um user_id na URL para saber a qual usuário associar o perfil.
+    """
+    queryset = ClienteProfile.objects.all()
+    serializer_class = ClienteProfileSerializer
+    permission_classes = [AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        user_id = self.kwargs.get('user_id')
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "Usuário com o ID fornecido não foi encontrado."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if hasattr(user, 'cliente_profile'):
+            return Response(
+                {"error": "Este usuário já possui um perfil de cliente."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+    
+        # Em vez de: cliente_profile = serializer.save()
+        # Diga ao save() qual usuário ele deve associar:
+        cliente_profile = serializer.save(user=user)
+        
+        return Response(
+            {
+                "message": "Cadastro de cliente finalizado com sucesso!",
+                "user_id": cliente_profile.user.id,
+                "profile_id": cliente_profile.id
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+
+class DeletarContaView(generics.GenericAPIView):
+    """
+    Recebe uma requisição DELETE autenticada (via token/JWT)
+    e deleta o usuário que fez a requisição (request.user).
+    """
+    
+   
+    permission_classes = [IsAuthenticated] 
+    
+   
+    def perform_destroy(self, instance):
+       
+        instance.delete()
+
+    def delete(self, request, *args, **kwargs):
+        
+        # 4. 'request.user' é o usuário identificado pelo token.
+        # Esta é a "sessão" que você mencionou.
+        user_to_delete = request.user 
+
+        # (Opcional) Salva os dados do usuário para a resposta
+        user_data = UserBasicSerializer(user_to_delete).data
+        
+        # 5. Deleta o usuário
+        self.perform_destroy(user_to_delete)
+        
+        return Response(
+            {"message": "Conta apagada com sucesso", "user": user_data},
+            status=status.HTTP_200_OK
+           
+        )
 
 class Tela1UserRegistrationView(generics.CreateAPIView):
     """
@@ -96,55 +176,14 @@ class Tela3LojistaEnderecoView(generics.UpdateAPIView):
             )
 
         return Response
+    
 
-class DeletarContaView(generics.GenericAPIView):
+    # ... (no final do arquivo, depois de Tela3LojistaEnderecoView)
+
+class MyTokenObtainPairView(TokenObtainPairView):
     """
-    POST com email+senha para confirmar exclusão.
-    Para testes locais permission_classes pode ficar vazio; em produção use IsAuthenticated
-    e compare request.user com o usuário autenticado.
+    Endpoint de Login.
+    Recebe 'email' e 'password', retorna 'access' e 'refresh' tokens.
+    O 'access' token conterá o 'role' (cliente/lojista).
     """
-    # permission_classes = [IsAuthenticated]
-    serializer_class = ConfirmDeleteSerializer
-
-    def _delete_lojista_files(self, lojista):
-        for f in (lojista.profile_picture, lojista.cover_picture):
-            try:
-                if f and hasattr(f, 'path') and os.path.isfile(f.path):
-                    os.remove(f.path)
-            except Exception:
-                pass
-
-    def perform_destroy(self, instance):
-        # remover dados relacionados de acordo com o tipo
-        if hasattr(instance, 'lojista_profile'):
-            loj = instance.lojista_profile
-            self._delete_lojista_files(loj)
-            loj.delete()
-            # aqui: opcionalmente apagar produtos, avaliações, etc.
-        if hasattr(instance, 'cliente_profile'):
-            instance.cliente_profile.delete()
-        # por fim, apagar o usuário
-        instance.delete()
-
-    def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data['user']
-
-        # Se em produção: garantir que o requester seja o próprio usuário autenticado
-        # if request.user != user:
-        #     return Response({"detail": "Credenciais não correspondem ao usuário autenticado."},
-        #                     status=status.HTTP_403_FORBIDDEN)
-
-        # Regras de negócio específicas
-        if getattr(user, 'is_lojista', False):
-            # Exemplo: impedir exclusão se houver pedidos pendentes
-            # if user_has_pending_orders(user):
-            #     return Response({"detail": "Existem pedidos pendentes."}, status=status.HTTP_400_BAD_REQUEST)
-            pass
-
-        with transaction.atomic():
-            user_data = UserBasicSerializer(user).data
-            self.perform_destroy(user)
-
-        return Response({"message": "Conta apagada com sucesso", "user": user_data}, status=status.HTTP_200_OK)
+    serializer_class = MyTokenObtainPairViewSerializer
