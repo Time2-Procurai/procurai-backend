@@ -4,7 +4,8 @@ from django.shortcuts import render,redirect,get_object_or_404
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import generics, status
-
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers.serializers import MyTokenObtainPairViewSerializer
 from rest_framework.permissions import AllowAny,IsAuthenticated,IsAdminUser
 
 from django.shortcuts import get_object_or_404
@@ -13,7 +14,7 @@ from .serializers.profile import ClienteProfileSerializer,UserListSerializer
 from .serializers.profile import Tela3LojistaEnderecoSerealizer
 from .serializers.profile import Tela2LojistaSerializer
 from .serializers.registration import Tela1UserCreationSerializer
-from .serializers.deleteUser import ConfirmDeleteSerializer
+from .serializers.deleteUser import UserBasicSerializer
 from apps.user.serializers.deleteUser import UserBasicSerializer
 
 class ClienteProfileRegistrationView(generics.CreateAPIView):
@@ -46,13 +47,10 @@ class ClienteProfileRegistrationView(generics.CreateAPIView):
             )
 
         # PONTO CRÍTICO 3: Estamos passando o objeto 'user' que encontramos para o serializer.
-        serializer = self.get_serializer(
-            data=request.data,
-            context={'user': user}
-        )
+        serializer = self.get_serializer(data=request.data)
         
         serializer.is_valid(raise_exception=True)
-        cliente_profile = serializer.save()
+        cliente_profile = serializer.save(user=user)
         
         return Response(
             {
@@ -62,6 +60,14 @@ class ClienteProfileRegistrationView(generics.CreateAPIView):
             },
             status=status.HTTP_201_CREATED
         )
+        
+class MyTokenObtainPairView(TokenObtainPairView):
+    """
+    Endpoint de Login.
+    Recebe 'email' e 'password', retorna 'access' e 'refresh' tokens.
+    O 'access' token conterá o 'role' (cliente/lojista).
+    """
+    serializer_class = MyTokenObtainPairViewSerializer
 
 
 class DeletarContaView(generics.GenericAPIView):
@@ -71,7 +77,7 @@ class DeletarContaView(generics.GenericAPIView):
     fornecidas correspondam ao mesmo usuário autenticado.
     """
     # permission_classes = [IsAuthenticated] 
-    serializer_class = ConfirmDeleteSerializer
+    serializer_class = UserBasicSerializer
 
     def perform_destroy(self, instance):
         # se precisar remover arquivos, faça aqui antes de instance.delete()
