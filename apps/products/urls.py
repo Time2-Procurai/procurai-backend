@@ -1,25 +1,11 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 from . import views
 
-app_name = 'products'
-
-# Router do DRF gera automaticamente as URLs
-router = DefaultRouter()
-router.register(r'products', views.ProductViewSet, basename='product')
-router.register(r'categories', views.CategoryViewSet, basename='category')
-
 urlpatterns = [
-    path('', include(router.urls)),
+    path('', views.ProductViewSet.as_view(), name='product-list-create'),
+    path("delete/<int:pk>/", views.ProductDelete.as_view(), name="product-delete"),
+    path("<int:pk>/", views.ProductViewSet.as_view(), name="product-detail"),
+    path("<str:category_name>/", views.ProductViewSet.as_view(), name="product-by-category"),
+    path("store/<int:owner_id>/", views.ProductViewSet.as_view(), name="products-by-store"),
+    path("<int:owner_id>/<str:category_name>", views.ProductViewSet.as_view(), name="category-by-store"),
 ]
-
-# URLs geradas automaticamente:
-# GET    /api/products/              - Lista produtos
-# POST   /api/products/              - Criar produto
-# GET    /api/products/{id}/         - Detalhe produto
-# PUT    /api/products/{id}/         - Atualizar produto
-# PATCH  /api/products/{id}/         - Atualizar parcialmente
-# DELETE /api/products/{id}/         - Deletar produto
-# GET    /api/products/my_products/  - Produtos do usuário
-# GET    /api/categories/            - Lista categorias
-# GET    /api/categories/{slug}/     - Detalhe categoria
