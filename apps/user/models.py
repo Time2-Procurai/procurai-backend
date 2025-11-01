@@ -9,7 +9,7 @@ class User(AbstractUser):
     email = models.EmailField(unique=True, verbose_name='E-mail')
     cpf = models.CharField(max_length=11, unique=True, verbose_name='CPF', blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True, null=True, verbose_name='Telefone')
-
+    
     # Campos para identificar se o usuário é Lojista ou Cliente
     is_lojista = models.BooleanField(default=False)
     is_cliente = models.BooleanField(default=False)
@@ -28,7 +28,7 @@ class ClienteProfile(models.Model):
         ('SAU', 'Saúde'),
         ('ELE', 'Eletrônicos'),
     ]
-
+    profile_picture = models.ImageField(upload_to='clientes/profile_pics', null=True, blank=True, verbose_name='Foto de Perfil')
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='cliente_profile')
 
     interesses = models.CharField(
@@ -48,7 +48,12 @@ class LojistaProfile(models.Model):
     CATEGORIA_EMPRESA = [('ROUP', 'Roupas e Acessórios'),
         ('ELET', 'Eletrônicos'),
         ('COSM', 'Cosméticos'),
-        ('REST', 'Restaurantes')]
+        ('REST', 'Restaurantes'),
+        ('Construção', 'Construção'),
+        ('Saúde', 'Saúde')
+    ]
+    
+    company_category = models.CharField(max_length=50, choices=CATEGORIA_EMPRESA, verbose_name="Categoria da Empresa")
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='lojista_profile')
 
@@ -58,7 +63,7 @@ class LojistaProfile(models.Model):
     company_name = models.CharField(max_length=255, verbose_name="Nome da Empresa")
     cnpj = models.CharField(max_length=18, unique=True, blank=True, null=True, verbose_name="CNPJ")
     company_type = models.CharField(max_length=50, choices=TIPO_EMPRESA, verbose_name="Tipo da Empresa")
-    company_category = models.CharField(max_length=50, choices=CATEGORIA_EMPRESA, verbose_name="Categoria da Empresa")
+    
     description = models.TextField(blank=True, null=True, verbose_name="Descrição da Empresa")
     operating_hours = models.CharField(max_length=100, blank=True, null=True, verbose_name="Horário de Funcionamento")
 
