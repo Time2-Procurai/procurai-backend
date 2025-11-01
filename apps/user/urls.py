@@ -17,9 +17,9 @@ urlpatterns = [
     path('register/tela2/cliente/<int:user_id>/', ClienteProfileRegistrationView.as_view(), name='register-tela2-cliente'),    
     path('delete-account/', DeletarContaView.as_view(), name='deletar-conta'),
     # Rota para Login (Obter token)
-    path('api/token/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('token/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
     # Rota para Refresh (Atualizar token)
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('token-refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     #path('api/products/', include('apps.products.urls')),
 
     path('register/tela3/lojista/<int:user_id>/', Tela3LojistaEnderecoView.as_view(),name='register-step3-lojista'),

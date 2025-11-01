@@ -24,8 +24,4 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/user/', include('apps.user.urls')),
     path('api/products/', include('apps.products.urls')),
-    # Rota para Login (Obter token)
-    path('api/token/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
-    # Rota para Refresh (Atualizar token)
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]
