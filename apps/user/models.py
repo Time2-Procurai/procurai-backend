@@ -9,7 +9,7 @@ class User(AbstractUser):
     email = models.EmailField(unique=True, verbose_name='E-mail')
     cpf = models.CharField(max_length=11, unique=True, verbose_name='CPF', blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True, null=True, verbose_name='Telefone')
-    
+    password = models.CharField(max_length=10,unique=False)
     # Campos para identificar se o usuário é Lojista ou Cliente
     is_lojista = models.BooleanField(default=False)
     is_cliente = models.BooleanField(default=False)

@@ -19,7 +19,7 @@ class ClienteProfileSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
                 
-        user = self.context['user']
+        user = validated_data.pop('user')
               
         user_data = {
             'full_name': validated_data.pop('full_name'),
@@ -93,4 +93,4 @@ class UserListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['id', 'email']
+        fields = ['id', 'email','password']
