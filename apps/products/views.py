@@ -4,6 +4,26 @@ from rest_framework.decorators import action
 from .models import Product
 from .serializers.product import ProductSerializer
 from django.contrib.auth import get_user_model
+from rest_framework import permissions
+
+
+"Inserindo permissões para lojistas autenticados"
+class IsLojistaOrReadOnly(permissions.BasePermission):
+    """
+    Permite leitura (GET, HEAD, OPTIONS) para qualquer um.
+    Permite escrita (POST, PUT, PATCH) apenas se o usuário
+    estiver autenticado E for um lojista.
+    """
+
+    def has_permission(self, request, view):
+        # Permite métodos seguros (GET, HEAD, OPTIONS) para todos
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        # Se não for um método seguro, verifica se o usuário
+        # está autenticado e é um Lojista.
+        # (Assumindo que seu User model tem o campo 'is_lojista')
+        return request.user.is_authenticated and request.user.is_lojista
 
 class IsOwnerOrReadOnly(permissions.BasePermission):
     """
@@ -31,7 +51,9 @@ class ProductViewSet(generics.ListCreateAPIView, generics.RetrieveUpdateAPIView)
     queryset = Product.objects.filter(available=True)
     serializer_class = ProductSerializer
     # permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
-    permission_classes = [permissions.AllowAny]
+    #permission_classes = [permissions.AllowAny]
+    
+    permission_classes = [IsLojistaOrReadOnly, IsOwnerOrReadOnly]
 
     def get_queryset(self):
         """
@@ -81,11 +103,12 @@ class ProductDelete(generics.DestroyAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     # permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
-    permission_classes = [permissions.AllowAny]
-
+    #permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
     def get_queryset(self):
         """
         Garante que o usuário só possa deletar seus próprios produtos
         """
         user = self.request.user
         return Product.objects.filter(owner=user)
+    
