@@ -34,7 +34,7 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return True
         # Write permissions apenas para o dono
-        return obj.owner == request.user and request.user.is_lojista
+        return obj.owner_id == request.user and request.user.is_lojista
 
 
 class ProductViewSet(generics.ListCreateAPIView, generics.RetrieveUpdateAPIView):
@@ -50,9 +50,7 @@ class ProductViewSet(generics.ListCreateAPIView, generics.RetrieveUpdateAPIView)
     """
     queryset = Product.objects.filter(available=True)
     serializer_class = ProductSerializer
-    # permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
-    #permission_classes = [permissions.AllowAny]
-    
+
     permission_classes = [IsLojistaOrReadOnly, IsOwnerOrReadOnly]
 
     def get_queryset(self):
@@ -79,9 +77,7 @@ class ProductViewSet(generics.ListCreateAPIView, generics.RetrieveUpdateAPIView)
         Associa o produto ao usuário autenticado
         """
         if serializer.is_valid():
-            # serializer.save(owner=self.request.user)
-            user = get_user_model().objects.get(id=5)
-            serializer.save(owner_id=user) # para fazer o teste do POST do produto
+            serializer.save(owner_id=self.request.user)
         else:
             print(serializer.errors)
 
@@ -91,7 +87,7 @@ class ProductViewSet(generics.ListCreateAPIView, generics.RetrieveUpdateAPIView)
         Endpoint customizado: GET /api/products/my_products/
         Retorna apenas produtos do usuário autenticado
         """
-        products = Product.objects.filter(owner=request.user)
+        products = Product.objects.filter(owner_id=request.user)
         serializer = self.get_serializer(products, many=True)
         return Response(serializer.data)
 
@@ -102,13 +98,11 @@ class ProductDelete(generics.DestroyAPIView):
     """
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-    # permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
-    #permission_classes = [permissions.AllowAny]
+
     permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
     def get_queryset(self):
         """
         Garante que o usuário só possa deletar seus próprios produtos
         """
         user = self.request.user
-        return Product.objects.filter(owner=user)
-    
+        return Product.objects.filter(owner_id=user)
