@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'apps.user',
     'rest_framework_simplejwt',
     'corsheaders',
+    'apps.evaluation',
     
 ]
 
