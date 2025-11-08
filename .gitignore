@@ -2,3 +2,34 @@
 # Python
 __pycache__/
 *.pyc
+
+/node_modules
+__pycache__/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.idea/
+.vscode/
+*.sublime-*
+
+<<<<<<< HEAD
+
+=======
+>>>>>>> dcf8ff9e5f7260a29d806f5a65faa73cf2608609
+# Arquivos do PyCharm
+/.idea/
+
+db.sqlite3
