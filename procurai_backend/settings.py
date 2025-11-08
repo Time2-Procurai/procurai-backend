@@ -39,7 +39,7 @@ SECRET_KEY = 'django-insecure-3&l)m7d98exv7$l14u*zpcqp%-%m*!puuz6mhc*g#sg7@0spe2
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -157,7 +157,11 @@ REST_FRAMEWORK = {
     ),
 }
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Porta padrão do Vite/React
-    "http://127.0.0.1:5173",
-]
+# CORS_ALLOWED_ORIGINS = [
+#     "http://localhost:5173",  # Porta padrão do Vite/React
+#     "http://127.0.0.1:5173",
+# ]
+
+# Allow all origins for cross-origin requests (use with caution in production).
+# For production you should replace this with an explicit list or regexes.
+CORS_ALLOW_ALL_ORIGINS = True
