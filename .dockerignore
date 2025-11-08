@@ -1,0 +1,5 @@
+# .ideia dir
+.idea/
+
+# sqlite file
+*.sqlite3

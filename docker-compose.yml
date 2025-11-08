@@ -1,0 +1,49 @@
+services:
+  web:
+    build: .
+    container_name: procurai-backend
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+
+    # healthcheck:
+    #   test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 5
+    networks:
+      procurai-network:
+        aliases:
+          - web
+
+  db:
+    image: postgres:13
+    container_name: procurai-database
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      procurai-network:
+        aliases:
+          - db
+
+volumes:
+  db_data:
+
+networks:
+  procurai-network:
+    driver: bridge
