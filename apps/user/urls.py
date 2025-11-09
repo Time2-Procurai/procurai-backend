@@ -4,6 +4,7 @@ from .views import ClienteProfileRegistrationView, Tela1UserRegistrationView, Te
 from rest_framework_simplejwt.views import TokenRefreshView
 from apps.user.views import MyTokenObtainPairView
 
+from .views import UserProfileView
 
 from .views import Tela1UserRegistrationView, Tela2LojistaProfileView, Tela3LojistaEnderecoView
 
@@ -23,6 +24,9 @@ urlpatterns = [
     #path('api/products/', include('apps.products.urls')),
 
     path('register/tela3/lojista/<int:user_id>/', Tela3LojistaEnderecoView.as_view(),name='register-step3-lojista'),
+
+    # Rota: GET ou PATCH para /api/user/profile/
+    path('profile/', UserProfileView.as_view(), name='user-profile'),
 ]
 
 
