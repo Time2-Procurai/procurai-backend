@@ -19,6 +19,7 @@ from apps.user.serializers.deleteUser import UserBasicSerializer
 from .serializers.profile import UserDataSerializer,LojistaProfileDataSerializer,ClienteProfileDataSerializer
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from .serializers.password import PasswordChangeSerializer
 
 
 class ClienteProfileRegistrationView(generics.CreateAPIView):
@@ -280,3 +281,33 @@ class UserProfileView(APIView):
      
         return self.get(request, *args, **kwargs)
    
+
+class ChangePasswordView(APIView):
+    """
+    Endpoint para o usuário logado (autenticado) alterar sua própria senha.
+    Recebe 'password' e 'password_confirm'.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, *args, **kwargs):
+        
+        user = request.user
+        
+        serializer = PasswordChangeSerializer(
+            data=request.data, 
+            context={'request': request} 
+        )
+
+        if serializer.is_valid():
+           
+            new_password = serializer.validated_data['password']
+            
+            user.set_password(new_password)
+            user.save()
+            
+            return Response(
+                {"message": "Senha alterada com sucesso!"}, 
+                status=status.HTTP_200_OK
+            )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

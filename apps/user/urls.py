@@ -4,7 +4,7 @@ from .views import ClienteProfileRegistrationView, Tela1UserRegistrationView, Te
 from rest_framework_simplejwt.views import TokenRefreshView
 from apps.user.views import MyTokenObtainPairView
 
-from .views import UserProfileView
+from .views import UserProfileView,ChangePasswordView
 
 from .views import Tela1UserRegistrationView, Tela2LojistaProfileView, Tela3LojistaEnderecoView
 
@@ -27,6 +27,8 @@ urlpatterns = [
 
     # Rota: GET ou PATCH para /api/user/profile/
     path('profile/', UserProfileView.as_view(), name='user-profile'),
+    # Rota: Mudança de senha
+    path('change-password/', ChangePasswordView.as_view(), name='change-password'),
 ]
 
 
