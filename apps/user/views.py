@@ -77,34 +77,31 @@ class MyTokenObtainPairView(TokenObtainPairView):
 
 class DeletarContaView(generics.GenericAPIView):
     """
-    Recebe POST com email+senha para confirmar exclusão.
-    Requer que o cliente já esteja autenticado (token/JWT) e que as credenciais
-    fornecidas correspondam ao mesmo usuário autenticado.
+    Recebe uma requisição DELETE autenticada (via token/JWT)
+    e deleta o usuário que fez a requisição (request.user).
     """
-    # permission_classes = [IsAuthenticated] 
-    serializer_class = UserBasicSerializer
-
+    permission_classes = [IsAuthenticated] 
+    
     def perform_destroy(self, instance):
-        # se precisar remover arquivos, faça aqui antes de instance.delete()
         instance.delete()
 
-    def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data['user']
+    def delete(self, request, *args, **kwargs):
+        #'request.user' é o usuário identificado pelo token
+        user_to_delete = request.user 
 
-        # if request.user != user:
-        #     return Response(
-        #         {"detail": "As credenciais não correspondem ao usuário autenticado."},
-        #         status=status.HTTP_403_FORBIDDEN
-        #     )
-
-        user_data = UserBasicSerializer(user).data
-        self.perform_destroy(user)
+        # (Opcional) Salva os dados do usuário para a resposta
+        user_data = UserBasicSerializer(user_to_delete).data
+        
+        # 5. Deleta o usuário
+        self.perform_destroy(user_to_delete)
+        
         return Response(
             {"message": "Conta apagada com sucesso", "user": user_data},
             status=status.HTTP_200_OK
         )
+    
+
+
 
 class Tela1UserRegistrationView(generics.CreateAPIView):
     """
@@ -311,3 +308,4 @@ class ChangePasswordView(APIView):
             )
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
