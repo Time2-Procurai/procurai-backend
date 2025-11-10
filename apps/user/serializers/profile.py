@@ -94,3 +94,37 @@ class UserListSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'email','password']
+
+
+# PÁGINA DE PERFIL (GET e PATCH)
+
+class UserDataSerializer(serializers.ModelSerializer):
+    """
+    Serializer para LER e ATUALIZAR o 'User'.
+    (Isso cuida do "nome de usuário")
+    """
+    class Meta:
+        model = User
+        # 'full_name' é o seu "nome de usuário"
+        fields = ['id', 'email', 'full_name', 'cpf', 'phone']
+        read_only_fields = ['id', 'email']
+
+class LojistaProfileDataSerializer(serializers.ModelSerializer):
+    """
+    Serializer para LER e ATUALIZAR o 'LojistaProfile'.
+    (Isso cuida da "foto de perfil" do Lojista)
+    """
+    class Meta:
+        model = LojistaProfile
+        fields = '__all__' # Pega todos os campos (incluindo a foto)
+        read_only_fields = ['user']
+
+class ClienteProfileDataSerializer(serializers.ModelSerializer):
+    """
+    Serializer para LER e ATUALIZAR o 'ClienteProfile'.
+    (Isso cuida dos "interesses" E da "foto de perfil" do Cliente)
+    """
+    class Meta:
+        model = ClienteProfile
+        fields = '__all__' # Pega todos os campos (incluindo interesses e foto)
+        read_only_fields = ['user']

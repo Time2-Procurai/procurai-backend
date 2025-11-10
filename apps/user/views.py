@@ -16,6 +16,11 @@ from .serializers.profile import Tela2LojistaSerializer
 from .serializers.registration import Tela1UserCreationSerializer
 from .serializers.deleteUser import UserBasicSerializer
 from apps.user.serializers.deleteUser import UserBasicSerializer
+from .serializers.profile import UserDataSerializer,LojistaProfileDataSerializer,ClienteProfileDataSerializer
+from rest_framework.views import APIView
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from .serializers.password import PasswordChangeSerializer
+
 
 class ClienteProfileRegistrationView(generics.CreateAPIView):
     """
@@ -72,34 +77,31 @@ class MyTokenObtainPairView(TokenObtainPairView):
 
 class DeletarContaView(generics.GenericAPIView):
     """
-    Recebe POST com email+senha para confirmar exclusão.
-    Requer que o cliente já esteja autenticado (token/JWT) e que as credenciais
-    fornecidas correspondam ao mesmo usuário autenticado.
+    Recebe uma requisição DELETE autenticada (via token/JWT)
+    e deleta o usuário que fez a requisição (request.user).
     """
-    # permission_classes = [IsAuthenticated] 
-    serializer_class = UserBasicSerializer
-
+    permission_classes = [IsAuthenticated] 
+    
     def perform_destroy(self, instance):
-        # se precisar remover arquivos, faça aqui antes de instance.delete()
         instance.delete()
 
-    def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data['user']
+    def delete(self, request, *args, **kwargs):
+        #'request.user' é o usuário identificado pelo token
+        user_to_delete = request.user 
 
-        # if request.user != user:
-        #     return Response(
-        #         {"detail": "As credenciais não correspondem ao usuário autenticado."},
-        #         status=status.HTTP_403_FORBIDDEN
-        #     )
-
-        user_data = UserBasicSerializer(user).data
-        self.perform_destroy(user)
+        # (Opcional) Salva os dados do usuário para a resposta
+        user_data = UserBasicSerializer(user_to_delete).data
+        
+        # 5. Deleta o usuário
+        self.perform_destroy(user_to_delete)
+        
         return Response(
             {"message": "Conta apagada com sucesso", "user": user_data},
             status=status.HTTP_200_OK
         )
+    
+
+
 
 class Tela1UserRegistrationView(generics.CreateAPIView):
     """
@@ -190,5 +192,120 @@ class UserListView(generics.ListAPIView):
     queryset = User.objects.all()    
    
     serializer_class = UserListSerializer 
-    
+
+
+class UserProfileView(APIView):
+    """
+    Endpoint para o usuário logado ver (GET) ou
+    atualizar (PATCH) seu próprio perfil (User + Profile).
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_profile_and_serializer_class(self, user):
+        """ Helper para pegar o perfil e o serializer corretos """
+        if user.is_lojista:
+            try:
+                profile = user.lojista_profile
+                serializer_class = LojistaProfileDataSerializer
+                return profile, serializer_class
+            except LojistaProfile.DoesNotExist:
+                return None, LojistaProfileDataSerializer
+        
+        elif user.is_cliente:
+            try:
+                profile = user.cliente_profile
+                serializer_class = ClienteProfileDataSerializer
+                return profile, serializer_class
+            except ClienteProfile.DoesNotExist:
+                return None, ClienteProfileDataSerializer
+            
+        return None, None # Se não for nem cliente nem lojista
+
+    def get(self, request, *args, **kwargs):
+        """
+        Retorna os dados do User + os dados do Profile (Lojista ou Cliente)
+        """
+        user = request.user 
+        # Busca o perfil (pode ser None se ainda não foi criado)
+        profile_instance, _ = self.get_profile_and_serializer_class(user)
+        
+        # Sempre serializa os dados do 'User'
+        user_serializer = UserDataSerializer(user)
+        response_data = {'user': user_serializer.data, 'profile': None}
+
+        # Se o perfil existir, serializa ele
+        if profile_instance:
+            if user.is_lojista:
+                response_data['profile'] = LojistaProfileDataSerializer(profile_instance).data
+            elif user.is_cliente:
+                response_data['profile'] = ClienteProfileDataSerializer(profile_instance).data
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    def patch(self, request, *args, **kwargs):
+        """
+        Atualiza (parcialmente) os dados do User e do Profile.
+        O frontend envia todos os dados (nome, interesses, foto) juntos.
+        """
+        user = request.user
+        
+        # 1. Atualiza o 'User' (nome de usuário / full_name)
+        # 'partial=True' significa que é um PATCH (só muda o que foi enviado)
+        user_serializer = UserDataSerializer(user, data=request.data, partial=True)
+        if user_serializer.is_valid():
+            user_serializer.save()
+        else:
+            
+            return Response(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Atualiza o 'Profile' (foto de perfil ou interesses)
+        profile_instance, ProfileSerializer = self.get_profile_and_serializer_class(user)
+        
+        # Só tenta atualizar se o perfil já existir
+        if profile_instance and ProfileSerializer:
+            
+            profile_serializer = ProfileSerializer(
+                profile_instance, data=request.data, partial=True
+            )
+            
+            if profile_serializer.is_valid():
+                profile_serializer.save()
+            else:
+              
+                return Response(profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+     
+        return self.get(request, *args, **kwargs)
    
+
+class ChangePasswordView(APIView):
+    """
+    Endpoint para o usuário logado (autenticado) alterar sua própria senha.
+    Recebe 'password' e 'password_confirm'.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, *args, **kwargs):
+        
+        user = request.user
+        
+        serializer = PasswordChangeSerializer(
+            data=request.data, 
+            context={'request': request} 
+        )
+
+        if serializer.is_valid():
+           
+            new_password = serializer.validated_data['password']
+            
+            user.set_password(new_password)
+            user.save()
+            
+            return Response(
+                {"message": "Senha alterada com sucesso!"}, 
+                status=status.HTTP_200_OK
+            )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
