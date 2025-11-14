@@ -18,11 +18,16 @@ from django.contrib import admin
 from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView
 from apps.user.views import MyTokenObtainPairView
-
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/user/', include('apps.user.urls')),
     path('api/products/', include('apps.products.urls')),
     path('api/evaluations/', include('apps.evaluation.urls')),
+    path('user/', include('apps.user.urls', namespace='user')),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
