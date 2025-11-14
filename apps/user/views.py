@@ -193,6 +193,15 @@ class UserListView(generics.ListAPIView):
    
     serializer_class = UserListSerializer 
 
+class GetUserByIdView(generics.RetrieveAPIView):
+    """
+    Endpoint da API para obter detalhes de um usuário específico pelo ID.
+    Retorna ID, Email, Full Name e Role (Cliente/Lojista).
+    """
+    queryset = User.objects.all()
+    serializer_class = UserListSerializer
+    lookup_field = 'id'
+    lookup_url_kwarg = 'user_id'
 
 class UserProfileView(APIView):
     """
