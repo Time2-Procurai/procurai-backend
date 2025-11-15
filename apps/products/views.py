@@ -5,7 +5,7 @@ from .models import Product
 from .serializers.product import ProductSerializer
 from django.contrib.auth import get_user_model
 from rest_framework import permissions
-
+from rest_framework.parsers import MultiPartParser, FormParser
 
 "Inserindo permissões para lojistas autenticados"
 class IsLojistaOrReadOnly(permissions.BasePermission):
@@ -40,44 +40,52 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
 class ProductViewSet(generics.ListCreateAPIView, generics.RetrieveUpdateAPIView):
     """
     ViewSet para CRUD completo de produtos
-
-    list: GET /api/products/ - Lista todos produtos disponíveis
-    retrieve: GET /api/products/{id}/ - Detalhes de um produto
-    create: POST /api/products/ - Criar produto (requer autenticação)
-    update: PUT /api/products/{id}/ - Atualizar produto (apenas dono)
-    partial_update: PATCH /api/products/{id}/ - Atualizar parcialmente (apenas dono)
-    destroy: DELETE /api/products/{id}/ - Deletar produto (apenas dono)
     """
     queryset = Product.objects.filter(available=True)
     serializer_class = ProductSerializer
-
     permission_classes = [IsLojistaOrReadOnly, IsOwnerOrReadOnly]
+    parser_classes = (MultiPartParser, FormParser) # (Garante que os parsers estão aqui)
+
+    # --- AJUSTE AQUI ---
+    # Adicione este método 'get'
+    def get(self, request, *args, **kwargs):
+        """
+        Verifica se um 'pk' (ID do produto) foi passado na URL.
+        Se sim, chama a lógica de 'retrieve' (detalhe).
+        Se não, chama a lógica de 'list' (lista).
+        """
+        if 'pk' in kwargs:
+            return self.retrieve(request, *args, **kwargs)
+        
+        return self.list(request, *args, **kwargs)
+    # --- FIM DO AJUSTE ---
 
     def get_queryset(self):
         """
-        Opcionalmente filtra produtos por categoria
+        Opcionalmente filtra produtos por categoria ou loja.
+        (Este método agora funcionará corretamente para a lista)
         """
         queryset = Product.objects.filter(available=True)
         category_name = self.kwargs.get('category_name')
         store_id = self.kwargs.get('owner_id')
 
-        if category_name:
-            queryset = queryset.filter(category_name=category_name)
-
+        # Se a URL for /products/store/ID/, filtra pela loja
         if store_id:
             queryset = queryset.filter(owner_id=store_id)
-
-        if category_name and store_id:
-            queryset = queryset.filter(category_name=category_name, owner_id=store_id)
-
+        # Se for /products/categoria/, filtra pela categoria
+        elif category_name:
+            queryset = queryset.filter(category_name=category_name)
+        # Se for /products/ (sem ID ou categoria), não filtra mais
+        # (A lógica de filtrar por usuário logado não deve estar aqui,
+        # a menos que seja para a rota 'my_products')
+            
         return queryset
 
-    # Em products/views.py
     def perform_create(self, serializer):
         """
-        Associa o produto ao usuário autenticado
+        Associa o produto ao usuário autenticado (request.user)
         """
-        # O serializer JÁ é válido se chegou aqui.       
+        # (Simplificado para ser mais robusto)
         serializer.save(owner_id=self.request.user)
 
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
