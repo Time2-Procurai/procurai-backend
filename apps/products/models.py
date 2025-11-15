@@ -39,6 +39,7 @@ class Product(models.Model):
         verbose_name='Categoria',
         default='outros'
     )
+    product_image = models.ImageField(upload_to='product_images/', verbose_name='Imagem do Produto', null=True, blank=True)
     is_service = models.BooleanField(default=False, verbose_name='É um Serviço')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Data de Criação')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Data de Atualização')
