@@ -7,6 +7,8 @@ from .views import (
     SuggestedCommunitiesView,
     IsFollowingCommunityView
 )
+from apps.community.views import PublicacaoCreateView, PublicacaoListView
+
 
 app_name = 'community'
 
@@ -27,4 +29,11 @@ urlpatterns = [
 
     # Verificar se o usuário está seguindo a comunidade
     path('<int:community_id>/esta-seguindo/', IsFollowingCommunityView.as_view(), name='community-is-following'),
+
+    # Publicações na comunidade
+    path('publicacoes/criar/', PublicacaoCreateView.as_view(), name='publicacao-create'),
+
+    # Listar publicações na comunidade
+    path('publicacoes/<int:comunidade_id>/listar/', PublicacaoListView.as_view(), name='publicacao-list')
+
 ]
