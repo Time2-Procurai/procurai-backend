@@ -21,6 +21,7 @@ from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .serializers.password import PasswordChangeSerializer
 from .serializers.serializers import UserDetailSerializer
+from rest_framework.filters import SearchFilter
 
 class ClienteProfileRegistrationView(generics.UpdateAPIView):
     """
@@ -195,11 +196,39 @@ class Tela3LojistaEnderecoView(generics.UpdateAPIView):
 class UserListView(generics.ListAPIView):
     """
     Endpoint da API para listar todos os usuários cadastrados.
-    Retorna apenas ID e Email.
+    Agora também filtra por 'search'.
     """
-    queryset = User.objects.all()    
-   
-    serializer_class = UserListSerializer 
+    # 2. Filtra apenas por lojistas (mais seguro)
+    queryset = User.objects.filter(is_lojista=True) 
+    serializer_class = UserListSerializer
+    
+    # --- 3. Adicione estas duas linhas ---
+    filter_backends = [SearchFilter]
+    # 4. Diga ao Django quais campos procurar
+    search_fields = ['full_name', 'lojista_profile__company_category']
+
+class EmpresaListView(generics.ListAPIView):
+    """
+    Endpoint da API para listar e buscar (search)
+    APENAS usuários que são Lojistas/Empresas.
+    """
+    queryset = User.objects.filter(is_lojista=True)
+    serializer_class = UserListSerializer # Use o serializer que mostra dados da empresa
+    permission_classes = [AllowAny] # Permite que qualquer um busque
+    
+    # Adiciona a funcionalidade de busca (ex: /empresas/?search=nome)
+    filter_backends = [SearchFilter]
+    search_fields = ['full_name', 'lojista_profile__company_category', 'lojista_profile__company_name']
+    
+
+class ClienteListView(generics.ListAPIView):
+    """
+    Endpoint da API para listar APENAS usuários que são Clientes.
+    (Provavelmente só para uso administrativo, então pode ser mais restrito)
+    """
+    queryset = User.objects.filter(is_cliente=True)
+    serializer_class = UserListSerializer # Use um serializer que mostre dados de cliente
+    permission_classes = [IsAdminUser]
 
 class GetUserByIdView(generics.RetrieveAPIView):
     """
