@@ -10,14 +10,12 @@ from rest_framework.parsers import MultiPartParser, FormParser
 class ProductEvaluationView(generics.ListCreateAPIView):
     """
     Endpoint da API para avaliações de produtos.
-    - GET: lista todas as avaliações de um produto específico
-    - POST: cria uma nova avaliação para o produto
+    (Esta view está correta, não precisa de mudanças)
     """
-
     serializer_class = EvaluationSerializer
-    # Mudar para IsAuthenticated para autenticação
     permission_classes = [permissions.IsAuthenticatedOrReadOnly] 
     parser_classes = (MultiPartParser, FormParser)
+    
     def get_queryset(self):
         product_id = self.kwargs.get('product_id')
         return Evaluation.objects.filter(product__id=product_id).order_by('-created_at')
@@ -26,7 +24,6 @@ class ProductEvaluationView(generics.ListCreateAPIView):
         product_id = self.kwargs.get('product_id')
         product = get_object_or_404(Product, id=product_id)
 
-        # Juntando os dados do produto ao request data
         data = request.data.copy()
         data['product'] = product.id
 
@@ -40,30 +37,35 @@ class ProductEvaluationView(generics.ListCreateAPIView):
         )
     
 class StoreEvaluationView(generics.ListCreateAPIView):
-    # ... (queryset, serializer_class)
-    
-    # --- CORREÇÕES ---
-    # 1. Somente usuários logados podem postar
+    """
+    Endpoint da API para avaliações de lojas.
+    (Corrigido para buscar pelo user_id)
+    """
     serializer_class = EvaluationSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    # 2. Essencial para aceitar FormData (fotos)
     parser_classes = (MultiPartParser, FormParser) 
 
     def get_queryset(self):
-        # ... (seu queryset otimizado)
-        store_id = self.kwargs.get('store_id')
-        return Evaluation.objects.filter(store__id=store_id)\
-                             .prefetch_related('photos', 'user')\
-                             .order_by('-created_at')
+        # --- CORREÇÃO AQUI ---
+        # O 'store_id' da URL é, na verdade, o ID do *usuário*
+        user_id = self.kwargs.get('store_id')
+        # Filtra as avaliações buscando pelo user_id do LojistaProfile
+        return Evaluation.objects.filter(store__user_id=user_id)\
+                                 .prefetch_related('photos', 'user')\
+                                 .order_by('-created_at')
     
     def create(self, request, *args, **kwargs):
-        store_id = self.kwargs.get('store_id')
-        store = get_object_or_404(LojistaProfile, id=store_id)
+        # --- CORREÇÃO AQUI ---
+        # 1. Pega o ID da URL (que é o ID do Usuário)
+        user_id = self.kwargs.get('store_id')
+        
+        # 2. Busca o LojistaProfile usando o 'user_id' (a FK para User)
+        store = get_object_or_404(LojistaProfile, user_id=user_id)
 
+        # 3. Agora 'store.id' é o ID correto do LojistaProfile
         data = request.data.copy()
-        data['store'] = store.id # Envia o ID para o serializer
+        data['store'] = store.id # Envia o ID do *Perfil* (ex: 5) para o serializer
 
-        # 3. Passa o 'request' para o 'context'
         serializer = self.get_serializer(data=data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
