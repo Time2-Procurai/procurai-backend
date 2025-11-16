@@ -3,18 +3,18 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-from apps.community.models import Community
 from apps.community.serializers.community_serializer import (
     CommunitySerializer,
     CommunityDetailSerializer,
     CommunityFollowSerializer,
     CommunityFollowerSerializer,
 )
-from .models import Publicacao, Comunidade
-from .serializers import PublicacaoSerializer
-
-
+from rest_framework.exceptions import PermissionDenied
+from .serializers.community_serializer import PublicacaoSerializer
+from apps.community.models import Community, Publicacao
 from apps.user.models import User, LojistaProfile
+
+
 
 class CommunityDetailView(generics.RetrieveAPIView):
     permission_classes = [permissions.AllowAny]
@@ -99,4 +99,36 @@ class IsFollowingCommunityView(APIView):
             status=status.HTTP_200_OK
         )
 
+class PublicacaoCreateView(generics.CreateAPIView):
+    
+    serializer_class = PublicacaoSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
+    def perform_create(self, serializer):
+
+        # Apenas lojistas podem criar publicação
+        if not self.request.user.is_lojista:
+            raise PermissionDenied("Apenas lojistas podem criar publicações.")
+
+        # Obtém o perfil do lojista
+        lojista_profile = get_object_or_404(LojistaProfile, user=self.request.user)
+
+        # Obtém automaticamente a comunidade associada ao lojista
+        comunidade = lojista_profile.community
+
+        # Salva a publicação com autor e comunidade definidos automaticamente
+        serializer.save(
+            autor=self.request.user,
+            comunidade=comunidade
+        )
+
+
+
+class PublicacaoListView(generics.ListAPIView):
+    serializer_class = PublicacaoSerializer
+    permission_classes = [permissions.AllowAny]  # Agora é público
+
+    def get_queryset(self):
+        comunidade_id = self.kwargs.get('comunidade_id')
+        comunidade = get_object_or_404(Community, id=comunidade_id)
+        return comunidade.publicacoes.all()

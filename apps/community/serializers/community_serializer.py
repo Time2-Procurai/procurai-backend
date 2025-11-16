@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from apps.community.models import Community
 from apps.user.models import User
-from apps.community.models import Publicacao, Comunidade
+from apps.community.models import Publicacao
 
 class CommunitySerializer(serializers.ModelSerializer):
     """
@@ -17,6 +17,7 @@ class CommunitySerializer(serializers.ModelSerializer):
             "descricao",
             "criada_em",
         ]
+        
 
 class CommunityDetailSerializer(serializers.ModelSerializer):
     """
