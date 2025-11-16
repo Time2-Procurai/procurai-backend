@@ -22,7 +22,8 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .serializers.password import PasswordChangeSerializer
 from .serializers.serializers import UserDetailSerializer
 from rest_framework.filters import SearchFilter
-
+from .serializers.serializers import UserDetailSerializer 
+from rest_framework.permissions import AllowAny
 class ClienteProfileRegistrationView(generics.UpdateAPIView):
     """
     Endpoint da API para a Etapa 2 do cadastro de Cliente.
@@ -212,13 +213,20 @@ class EmpresaListView(generics.ListAPIView):
     Endpoint da API para listar e buscar (search)
     APENAS usuários que são Lojistas/Empresas.
     """
-    queryset = User.objects.filter(is_lojista=True)
-    serializer_class = UserListSerializer # Use o serializer que mostra dados da empresa
-    permission_classes = [AllowAny] # Permite que qualquer um busque
+    queryset = User.objects.filter(is_lojista=True).select_related('lojista_profile') # Otimizado
     
-    # Adiciona a funcionalidade de busca (ex: /empresas/?search=nome)
+    # --- 2. MUDE A LINHA ABAIXO ---
+    serializer_class = UserDetailSerializer # <--- Use o serializer de detalhe
+    
+    permission_classes = [AllowAny] 
     filter_backends = [SearchFilter]
     search_fields = ['full_name', 'lojista_profile__company_category', 'lojista_profile__company_name']
+    
+    # --- 3. ADICIONE O CONTEXTO (PARA A URL DA IMAGEM) ---
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context.update({"request": self.request})
+        return context
     
 
 class ClienteListView(generics.ListAPIView):
