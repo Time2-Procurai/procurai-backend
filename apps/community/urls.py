@@ -21,7 +21,7 @@ urlpatterns = [
 
     # Lista de seguidores
     path('<int:community_id>/seguidores/', CommunityFollowersListView.as_view(), name='community-followers'),
--
+
     # Comunidades sugeridas
     path('sugeridas/', SuggestedCommunitiesView.as_view(), name='community-suggested'),
 
