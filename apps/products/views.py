@@ -72,14 +72,13 @@ class ProductViewSet(generics.ListCreateAPIView, generics.RetrieveUpdateAPIView)
 
         return queryset
 
+    # Em products/views.py
     def perform_create(self, serializer):
         """
         Associa o produto ao usuário autenticado
         """
-        if serializer.is_valid():
-            serializer.save(owner_id=self.request.user)
-        else:
-            print(serializer.errors)
+        # O serializer JÁ é válido se chegou aqui.       
+        serializer.save(owner_id=self.request.user)
 
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def my_products(self, request):

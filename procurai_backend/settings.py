@@ -58,8 +58,23 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'apps.evaluation',
-    
+    'cloudinary_storage',
+    'cloudinary',
+    'apps.community.apps.CommunityConfig',
 ]
+
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': 'dsf8twrap',
+    'API_KEY': '695119196736146',
+    'API_SECRET': 'cJw5jxIIiB72L9T1OpyNEyrdKH0',
+}
+
+MEDIA_URL = '/media/'
+
+# O caminho no HD onde seus arquivos estão salvos
+MEDIA_ROOT = BASE_DIR / 'media'
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

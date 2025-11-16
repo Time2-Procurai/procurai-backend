@@ -2,8 +2,17 @@ services:
   web:
     build: .
     container_name: procurai-backend
+    
+    # --- ADICIONE ESTA LINHA ---
+    # Força o Docker a usar o servidor de desenvolvimento, que
+    # obedece à regra static() do urls.py
+    command: python manage.py runserver 0.0.0.0:8000
+    
     volumes:
       - .:/app
+      # --- ADICIONE ESTA LINHA ---
+      # Mapeia a pasta 'media' do seu PC para dentro do container
+      - ./media:/app/media 
     ports:
       - "8080:8000"
     env_file:
@@ -11,18 +20,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
-
-    # healthcheck:
-    #   test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 5
     networks:
       procurai-network:
         aliases:
           - web
 
   db:
+    # (Seu serviço 'db' está perfeito, não mude nada)
     image: postgres:16-alpine
     container_name: procurai-database
     environment:

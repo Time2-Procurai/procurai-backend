@@ -1,5 +1,5 @@
 
-from .models import ClienteProfile
+from .models import ClienteProfile,User
 from django.shortcuts import render,redirect,get_object_or_404
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -16,54 +16,54 @@ from .serializers.profile import Tela2LojistaSerializer
 from .serializers.registration import Tela1UserCreationSerializer
 from .serializers.deleteUser import UserBasicSerializer
 from apps.user.serializers.deleteUser import UserBasicSerializer
-from .serializers.profile import UserDataSerializer,LojistaProfileDataSerializer,ClienteProfileDataSerializer
+from .serializers.profile import UserDataSerializer,ClienteProfileRegistrationSerializer,LojistaProfileDataSerializer,ClienteProfileDataSerializer
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .serializers.password import PasswordChangeSerializer
+from .serializers.serializers import UserDetailSerializer
 
-
-class ClienteProfileRegistrationView(generics.CreateAPIView):
+class ClienteProfileRegistrationView(generics.UpdateAPIView):
     """
     Endpoint da API para a Etapa 2 do cadastro de Cliente.
-    Recebe um user_id na URL para saber a qual usuário associar o perfil.
+    Recebe um user_id na URL e ATUALIZA o User com 'full_name', 'cpf', etc.
+    e CRIA o ClienteProfile associado (com a imagem).
     """
-    queryset = ClienteProfile.objects.all()
-    serializer_class = ClienteProfileSerializer
+    # 1. Estamos atualizando um 'User', não criando um 'ClienteProfile'
+    queryset = User.objects.all()
+    
+    # 2. Precisamos do serializer que lida com dados aninhados (User + Profile)
+    serializer_class = ClienteProfileRegistrationSerializer
+    
+    # 3. ADICIONE ISTO: Permite que a view entenda uploads de arquivos (multipart/form-data)
+    parser_classes = (MultiPartParser, FormParser)
+    
     permission_classes = [AllowAny]
+    
+    # 4. Define como encontrar o usuário pela URL
+    lookup_field = 'id'
+    lookup_url_kwarg = 'user_id'
 
-    def create(self, request, *args, **kwargs):
-        # PONTO CRÍTICO 1: Estamos pegando o 'user_id' que vem da URL.
-        user_id = self.kwargs.get('user_id')
+    def post(self, request, *args, **kwargs):
+        """
+        Sobrescreve o 'post' para que ele se comporte como um 'patch' (atualização parcial).
+        O seu React está enviando um POST.
+        """
+        # 'partial_update' é a lógica exata que precisamos:
+        # Pega o 'user' da URL, aplica os dados do 'request' (incluindo a foto)
+        # e salva usando a lógica do nosso novo serializer.
+        return self.partial_update(request, *args, **kwargs)
 
-        # PONTO CRÍTICO 2: Estamos buscando o usuário no banco de dados com esse ID.
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response(
-                {"error": "Usuário com o ID fornecido não foi encontrado."},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        # Verificação extra: impede a criação de um segundo perfil para o mesmo usuário.
-        if hasattr(user, 'cliente_profile'):
-            return Response(
-                {"error": "Este usuário já possui um perfil de cliente."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # PONTO CRÍTICO 3: Estamos passando o objeto 'user' que encontramos para o serializer.
-        serializer = self.get_serializer(data=request.data)
+    def partial_update(self, request, *args, **kwargs):
+        # Chama o processo de atualização padrão
+        response = super().partial_update(request, *args, **kwargs)
         
-        serializer.is_valid(raise_exception=True)
-        cliente_profile = serializer.save(user=user)
-        
+        # Retorna uma resposta de sucesso customizada
         return Response(
             {
                 "message": "Cadastro de cliente finalizado com sucesso!",
-                "user_id": cliente_profile.user.id,
-                "profile_id": cliente_profile.id
+                "user_data": response.data
             },
-            status=status.HTTP_201_CREATED
+            status=status.HTTP_200_OK
         )
         
 class MyTokenObtainPairView(TokenObtainPairView):
@@ -140,6 +140,10 @@ class Tela2LojistaProfileView(generics.CreateAPIView):
     queryset = LojistaProfile.objects.all()
     serializer_class = Tela2LojistaSerializer
     permission_classes = [AllowAny]
+    
+    # --- AJUSTE AQUI ---
+    # Adicione esta linha para que a view entenda FormData (uploads de arquivos)
+    parser_classes = (MultiPartParser, FormParser)
 
     def create(self, request, *args, **kwargs):
         user_id = self.kwargs['user_id']
@@ -150,15 +154,19 @@ class Tela2LojistaProfileView(generics.CreateAPIView):
         if hasattr(user, 'lojista_profile'):
             return Response({"error": "Este usuário já possui um perfil."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Agora, o request.data conterá os campos de texto E os arquivos de imagem
         serializer = self.get_serializer(data=request.data, context={'user': user})
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
 
         return Response(
-            {"message": "Etapa 2 concluída. Perfil da empresa preenchido."}
+            {"message": "Etapa 2 concluída. Perfil da empresa preenchido."},
+            status=status.HTTP_201_CREATED # 201 é o status correto para 'create'
         )
 
     def perform_create(self, serializer):
+        # O ImageField (configurado no serializer ou model) agora
+        # usará o MEDIA_ROOT e salvará o arquivo na pasta correta.
         serializer.save()
 
 class Tela3LojistaEnderecoView(generics.UpdateAPIView):
@@ -195,13 +203,24 @@ class UserListView(generics.ListAPIView):
 
 class GetUserByIdView(generics.RetrieveAPIView):
     """
-    Endpoint da API para obter detalhes de um usuário específico pelo ID.
-    Retorna ID, Email, Full Name e Role (Cliente/Lojista).
+    Endpoint da API para obter TODOS os detalhes de um usuário (User + Profile) 
+    pelo ID.
     """
-    queryset = User.objects.all()
-    serializer_class = UserListSerializer
+    
+    # 1. Queryset otimizado:
+    # .select_related() "pré-busca" os perfis numa única query.
+    queryset = User.objects.all().select_related('lojista_profile', 'cliente_profile')
+    
+    serializer_class = UserDetailSerializer
     lookup_field = 'id'
     lookup_url_kwarg = 'user_id'
+
+    # 2. Adicione este método:
+    # Isso passa o 'request' para o contexto do serializer.
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context.update({"request": self.request})
+        return context
 
 class UserProfileView(APIView):
     """
