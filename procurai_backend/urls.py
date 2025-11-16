@@ -27,6 +27,7 @@ urlpatterns = [
     path('api/products/', include('apps.products.urls')),
     path('api/evaluations/', include('apps.evaluation.urls')),
     path('user/', include('apps.user.urls', namespace='user')),
+    path('api/community/', include('apps.community.urls')),
 ]
 
 if settings.DEBUG:

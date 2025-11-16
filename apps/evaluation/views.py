@@ -66,6 +66,7 @@ class StoreEvaluationView(generics.ListCreateAPIView):
         data = request.data.copy()
         data['store'] = store.id # Envia o ID do *Perfil* (ex: 5) para o serializer
 
+        # 3. Passa o 'request' para o 'context'
         serializer = self.get_serializer(data=data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()

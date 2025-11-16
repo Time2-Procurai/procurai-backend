@@ -60,7 +60,7 @@ INSTALLED_APPS = [
     'apps.evaluation',
     'cloudinary_storage',
     'cloudinary',
-    
+    'apps.community.apps.CommunityConfig',
 ]
 
 CLOUDINARY_STORAGE = {
