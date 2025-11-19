@@ -7,7 +7,11 @@ from rest_framework import generics, status
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers.serializers import MyTokenObtainPairViewSerializer
 from rest_framework.permissions import AllowAny,IsAuthenticated,IsAdminUser
-
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.core.mail import send_mail
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from .models import User, LojistaProfile
 from .serializers.profile import ClienteProfileSerializer,UserListSerializer
@@ -373,4 +377,68 @@ class ChangePasswordView(APIView):
             )
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+ 
+ 
+ # views para resetar a senha via email
+class PasswordResetRequestView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({"error": "E-mail é obrigatório"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            # Por segurança, não dizemos se o usuário existe ou não,
+            # mas retornamos sucesso para evitar enumeração de usuários.
+            return Response({"message": "Se o e-mail existir, um link foi enviado."}, status=status.HTTP_200_OK)
+
+        # 1. Gerar Token e UID
+        token = default_token_generator.make_token(user)
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+
+        # 2. Construir o Link para o seu FRONTEND (React)
+        # Ajuste a porta se seu React não estiver na 5173
+        reset_link = f"http://localhost:5173/redefinir-senha/{uid}/{token}"
+
+        # 3. Enviar E-mail
+        send_mail(
+            subject="Redefinição de Senha - PROCURAÍ",
+            message=f"Olá {user.full_name},\n\nClique no link abaixo para redefinir sua senha:\n\n{reset_link}",
+            from_email=settings.EMAIL_HOST_USER, # Configure isso no settings.py
+            recipient_list=[email],
+            fail_silently=False,
+        )
+
+        return Response({"message": "Link de redefinição enviado."}, status=status.HTTP_200_OK)
+
+
+# --- VIEW 2: Efetiva a Troca da Senha ---
+class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        uidb64 = request.data.get('uid')
+        token = request.data.get('token')
+        password = request.data.get('password')
+
+        if not uidb64 or not token or not password:
+            return Response({"error": "Dados incompletos"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # 1. Decodificar o ID do usuário
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response({"error": "Link inválido"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Verificar se o token é válido
+        if default_token_generator.check_token(user, token):
+            # 3. Definir a nova senha
+            user.set_password(password)
+            user.save()
+            return Response({"message": "Senha alterada com sucesso!"}, status=status.HTTP_200_OK)
+        
+        return Response({"error": "Token inválido ou expirado"}, status=status.HTTP_400_BAD_REQUEST)   

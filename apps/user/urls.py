@@ -1,6 +1,7 @@
 
 from django.urls import path
 from . import views
+from .views import PasswordResetRequestView, PasswordResetConfirmView
 from .views import (
     ClienteProfileRegistrationView, 
     Tela1UserRegistrationView, 
@@ -32,5 +33,10 @@ urlpatterns = [
     # Rotas de Perfil
     path('profile/', UserProfileView.as_view(), name='user-profile'),
     path('change-password/', ChangePasswordView.as_view(), name='change-password'),
+    # Rota para PEDIR o e-mail (o que seu ForgotPasswordPage usa)
+    path('password_reset/', PasswordResetRequestView.as_view(), name='password_reset_request'),
+    
+    # Rota para CONFIRMAR a nova senha (usada pela próxima tela do React)
+    path('password_reset_confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
 ]
 
