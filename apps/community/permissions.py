@@ -20,3 +20,11 @@ class IsCommunityFollower(BasePermission):
             return False
 
         return community.seguidores.filter(id=request.user.id).exists()
+    
+class IsAutorDaPublicacao(BasePermission):
+    """
+    Permite acesso apenas ao autor da publicação.
+    """
+    def has_object_permission(self, request, view, obj):
+        # A permissão de escrita é concedida apenas ao autor da publicação.
+        return obj.autor == request.user

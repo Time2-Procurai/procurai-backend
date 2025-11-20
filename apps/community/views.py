@@ -13,6 +13,7 @@ from rest_framework.exceptions import PermissionDenied
 from .serializers.community_serializer import PublicacaoSerializer
 from apps.community.models import Community, Publicacao
 from apps.user.models import User, LojistaProfile
+from .permissions import IsAutorDaPublicacao
 
 
 
@@ -132,3 +133,13 @@ class PublicacaoListView(generics.ListAPIView):
         comunidade_id = self.kwargs.get('comunidade_id')
         comunidade = get_object_or_404(Community, id=comunidade_id)
         return comunidade.publicacoes.all()
+
+class PublicacaoDeleteView(generics.DestroyAPIView):
+    """
+    Endpoint para deletar uma publicação específica.
+    Apenas o autor da publicação pode deletá-la.
+    """
+    queryset = Publicacao.objects.all()
+    serializer_class = PublicacaoSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAutorDaPublicacao]
+
