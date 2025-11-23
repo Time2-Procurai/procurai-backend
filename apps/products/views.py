@@ -1,4 +1,4 @@
-from rest_framework import viewsets, permissions, generics
+from rest_framework import viewsets, permissions, generics, views
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import Product
@@ -6,7 +6,9 @@ from .serializers.product import ProductSerializer
 from django.contrib.auth import get_user_model
 from rest_framework import permissions
 from rest_framework.parsers import MultiPartParser, FormParser
-
+from apps.products.models import Product, Favorite
+from apps.products.serializers.favorite import FavoriteSerializer
+from django.shortcuts import get_object_or_404
 "Inserindo permissões para lojistas autenticados"
 class IsLojistaOrReadOnly(permissions.BasePermission):
     """
@@ -113,3 +115,43 @@ class ProductDelete(generics.DestroyAPIView):
         """
         user = self.request.user
         return Product.objects.filter(owner_id=user)
+
+
+class ToggleFavoriteView(views.APIView):
+    """
+    Endpoint para favoritar/desfavoritar um produto.
+    POST /api/products/favorite/<product_id>/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, product_id):
+        # Verifica se é um cliente (opcional, se sua regra de negócio exigir)
+        if not request.user.is_cliente:
+             return Response({"error": "Apenas clientes podem favoritar produtos."}, status=status.HTTP_403_FORBIDDEN)
+
+        product = get_object_or_404(Product, id=product_id)
+        
+        # Tenta buscar o favorito existente
+        favorite_item, created = Favorite.objects.get_or_create(user=request.user, product=product)
+
+        if not created:
+            # Se já existia (created=False), então o usuário quer remover (desfavoritar)
+            favorite_item.delete()
+            return Response({"message": "Produto removido dos favoritos.", "is_favorited": False}, status=status.HTTP_200_OK)
+        
+        # Se foi criado agora
+        return Response({"message": "Produto adicionado aos favoritos.", "is_favorited": True}, status=status.HTTP_201_CREATED)
+
+
+class UserFavoritesListView(generics.ListAPIView):
+    """
+    Endpoint seguro que lista APENAS os favoritos do usuário logado.
+    GET /api/products/favorites/
+    """
+    serializer_class = FavoriteSerializer
+    permission_classes = [permissions.IsAuthenticated] # Obrigatório estar logado
+
+    def get_queryset(self):        
+        # Filtra os favoritos onde o campo 'user' é igual ao usuário da requisição (request.user)
+        # O request.user é determinado automaticamente pelo Token enviado no cabeçalho.
+        return Favorite.objects.filter(user=self.request.user).order_by('-created_at')

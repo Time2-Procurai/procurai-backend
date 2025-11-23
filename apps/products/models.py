@@ -56,3 +56,28 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
+    
+class Favorite(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='favorites', # Permite acessar user.favorites.all()
+        verbose_name='Usuário'
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name='favorited_by', # Permite acessar product.favorited_by.all()
+        verbose_name='Produto'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Favoritado em')
+
+    class Meta:
+        verbose_name = 'Favorito'
+        verbose_name_plural = 'Favoritos'
+        # Garante que um usuário só pode favoritar o mesmo produto uma vez
+        unique_together = ('user', 'product')
+        ordering = ['-created_at'] # Ordem padrão: mais recentes primeiro
+
+    def __str__(self):
+        return f"{self.user.username} favoritou {self.product.name}"
