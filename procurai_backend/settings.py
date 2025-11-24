@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'cloudinary_storage',
     'cloudinary',
     'apps.community.apps.CommunityConfig',
+    'django_filters',
 ]
 
 CLOUDINARY_STORAGE = {

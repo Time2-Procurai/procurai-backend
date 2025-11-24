@@ -1,10 +1,12 @@
 from rest_framework import viewsets, permissions, generics, views
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from django_filters import rest_framework as filters
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
 from .models import Product
 from .serializers.product import ProductSerializer
 from django.contrib.auth import get_user_model
-from rest_framework import permissions
 from rest_framework.parsers import MultiPartParser, FormParser
 from apps.products.models import Product, Favorite
 from apps.products.serializers.favorite import FavoriteSerializer
@@ -155,3 +157,58 @@ class UserFavoritesListView(generics.ListAPIView):
         # Filtra os favoritos onde o campo 'user' é igual ao usuário da requisição (request.user)
         # O request.user é determinado automaticamente pelo Token enviado no cabeçalho.
         return Favorite.objects.filter(user=self.request.user).order_by('-created_at')
+
+class ProductFilter(filters.FilterSet):
+    """
+    Filtro completo para produtos com múltiplas opções
+    """
+    
+    # Filtro por nome (parcial, case-insensitive)
+    name = filters.CharFilter(field_name='name', lookup_expr='icontains')
+    
+    # Filtro por categoria (exato)
+    category_name = filters.CharFilter(field_name='category_name', lookup_expr='exact')
+    
+    # Filtro por faixa de preço
+    min_price = filters.NumberFilter(field_name='price', lookup_expr='gte')
+    max_price = filters.NumberFilter(field_name='price', lookup_expr='lte')
+    
+    # Filtro por loja/vendedor
+    owner_id = filters.NumberFilter(field_name='owner_id', lookup_expr='exact')
+    
+    # Filtro por produto
+    id = filters.NumberFilter(field_name='id', lookup_expr='exact')
+    
+    # Filtro por disponibilidade
+    available = filters.BooleanFilter(field_name='available')
+    
+    class Meta:
+        model = Product
+        fields = ['name', 'category_name', 'min_price', 'max_price', 'owner_id', 'available']
+        
+class ProductListView(generics.ListAPIView):
+    """
+    View para listar produtos com múltiplos filtros
+    
+    Exemplos de uso:
+    - /api/products/search/ - lista todos os produtos
+    - /api/products/search/?name=telefone - filtra por nome
+    - /api/products/search/?category_name=eletronicos - filtra por categoria
+    - /api/products/search/?min_price=100&max_price=500 - filtra por faixa de preço
+    - /api/products/search/?owner_id=3 - filtra por loja/vendedor
+    """
+    queryset = Product.objects.filter(available=True)
+    serializer_class = ProductSerializer
+    permission_classes = [permissions.AllowAny]
+    
+    # Backends de filtro, busca e ordenação
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    
+    # Configuração do django-filter
+    filterset_class = ProductFilter
+    
+    # Configuração de busca
+    search_fields = ['name', 'description', 'category_name', 'id']
+    
+    # Configuração de ordenação
+    ordering_fields = ['price', 'name']

@@ -3,11 +3,13 @@ from . import views
 
 urlpatterns = [
     path('', views.ProductViewSet.as_view(), name='product-list-create'),
+    path("search/", views.ProductListView.as_view(), name="product-search"),
     path("delete/<int:pk>/", views.ProductDelete.as_view(), name="product-delete"),
-    path("<int:pk>/", views.ProductViewSet.as_view(), name="product-detail"),
-    path("<str:category_name>/", views.ProductViewSet.as_view(), name="product-by-category"),
-    path("store/<int:owner_id>/", views.ProductViewSet.as_view(), name="products-by-store"),
-    path("<int:owner_id>/<str:category_name>", views.ProductViewSet.as_view(), name="category-by-store"),
+    path("<int:pk>/", views.ProductViewSet.as_view(), name="product-detail"), # pode ser removida
+    path("<str:category_name>/", views.ProductViewSet.as_view(), name="product-by-category"), # pode ser removida
+    path("store/<int:owner_id>/", views.ProductViewSet.as_view(), name="products-by-store"), # pode ser removida
+    path("<int:owner_id>/<str:category_name>", views.ProductViewSet.as_view(), name="category-by-store"), # pode ser removida
+    
     # Rota para listar (deve vir antes de rotas com ID dinâmico para evitar conflito)
     path('favorites/', views.UserFavoritesListView.as_view(), name='user-favorites-list'),
     
