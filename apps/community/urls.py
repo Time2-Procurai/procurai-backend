@@ -5,7 +5,11 @@ from .views import (
     UnfollowCommunityView,
     CommunityFollowersListView,
     SuggestedCommunitiesView,
-    IsFollowingCommunityView
+    IsFollowingCommunityView,
+    CurtirPublicacaoView,
+    DescurtirPublicacaoView,
+    ComentarPublicacaoView,
+    ListarComentariosView
 )
 from apps.community.views import PublicacaoCreateView, PublicacaoListView
 
@@ -34,6 +38,14 @@ urlpatterns = [
     path('publicacoes/criar/', PublicacaoCreateView.as_view(), name='publicacao-create'),
 
     # Listar publicações na comunidade
-    path('publicacoes/<int:comunidade_id>/listar/', PublicacaoListView.as_view(), name='publicacao-list')
+    path('publicacoes/<int:comunidade_id>/listar/', PublicacaoListView.as_view(), name='publicacao-list'),
+
+    # Curtir / Descurtir
+    path('publicacoes/<int:publicacao_id>/curtir/', CurtirPublicacaoView.as_view(), name='publicacao-curtir'),
+    path('publicacoes/<int:publicacao_id>/descurtir/', DescurtirPublicacaoView.as_view(), name='publicacao-descurtir'),
+
+    # Comentários
+    path('publicacoes/<int:publicacao_id>/comentar/', ComentarPublicacaoView.as_view(), name='publicacao-comentar'),
+    path('publicacoes/<int:publicacao_id>/comentarios/', ListarComentariosView.as_view(), name='publicacao-comentarios'),
 
 ]
