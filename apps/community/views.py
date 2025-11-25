@@ -13,6 +13,8 @@ from rest_framework.exceptions import PermissionDenied
 from .serializers.community_serializer import PublicacaoSerializer
 from apps.community.models import Community, Publicacao
 from apps.user.models import User, LojistaProfile
+from apps.community.models import Community, Publicacao, Curtida, Comentario
+from .serializers.comment_like_serializer import CurtidaSerializer, ComentarioSerializer
 
 
 
@@ -132,3 +134,77 @@ class PublicacaoListView(generics.ListAPIView):
         comunidade_id = self.kwargs.get('comunidade_id')
         comunidade = get_object_or_404(Community, id=comunidade_id)
         return comunidade.publicacoes.all()
+
+class CurtirPublicacaoView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, publicacao_id):
+        publicacao = get_object_or_404(Publicacao, id=publicacao_id)
+
+        # verifica se já curtiu
+        if Curtida.objects.filter(publicacao=publicacao, usuario=request.user).exists():
+            return Response(
+                {"message": "Você já curtiu esta publicação."},
+                status=status.HTTP_200_OK
+            )
+        
+        Curtida.objects.create(publicacao=publicacao, usuario=request.user)
+
+        return Response(
+            {"message": "Publicação curtida com sucesso."},
+            status=status.HTTP_201_CREATED
+        )
+
+class DescurtirPublicacaoView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, publicacao_id):
+        publicacao = get_object_or_404(Publicacao, id=publicacao_id)
+
+        curtida = Curtida.objects.filter(publicacao=publicacao, usuario=request.user).first()
+
+        if not curtida:
+            return Response(
+                {"message": "Você não curtiu esta publicação."},
+                status=status.HTTP_200_OK
+            )
+        
+        curtida.delete()
+
+        return Response(
+            {"message": "Curtida removida."},
+            status=status.HTTP_200_OK
+        )
+
+class ComentarPublicacaoView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, publicacao_id):
+        publicacao = get_object_or_404(Publicacao, id=publicacao_id)
+
+        texto = request.data.get("texto")
+        if not texto:
+            return Response(
+                {"error": "Texto do comentário é obrigatório."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        comentario = Comentario.objects.create(
+            publicacao=publicacao,
+            autor=request.user,
+            texto=texto
+        )
+
+        return Response(
+            ComentarioSerializer(comentario).data,
+            status=status.HTTP_201_CREATED
+        )
+
+class ListarComentariosView(generics.ListAPIView):
+    serializer_class = ComentarioSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        publicacao_id = self.kwargs.get("publicacao_id")
+        publicacao = get_object_or_404(Publicacao, id=publicacao_id)
+        return publicacao.comentarios.all()
