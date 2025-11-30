@@ -28,6 +28,7 @@ from .serializers.serializers import UserDetailSerializer
 from rest_framework.filters import SearchFilter
 from .serializers.serializers import UserDetailSerializer 
 from rest_framework.permissions import AllowAny
+from apps.community.models import Community
 class ClienteProfileRegistrationView(generics.UpdateAPIView):
     """
     Endpoint da API para a Etapa 2 do cadastro de Cliente.
@@ -140,15 +141,12 @@ class Tela1UserRegistrationView(generics.CreateAPIView):
 
 class Tela2LojistaProfileView(generics.CreateAPIView):
     """
-    Endpoint da API para a segunda etapa de cadastro de usuário, agora um lojista.
-    Cria o LojistaProfile e o associa a um User existente e criado na Etapa 1.
+    Endpoint da API para a segunda etapa de cadastro de usuário (Lojista).
+    Cria o LojistaProfile e AUTOMATICAMENTE cria uma Comunidade vinculada.
     """
     queryset = LojistaProfile.objects.all()
     serializer_class = Tela2LojistaSerializer
     permission_classes = [AllowAny]
-    
-    # --- AJUSTE AQUI ---
-    # Adicione esta linha para que a view entenda FormData (uploads de arquivos)
     parser_classes = (MultiPartParser, FormParser)
 
     def create(self, request, *args, **kwargs):
@@ -157,22 +155,35 @@ class Tela2LojistaProfileView(generics.CreateAPIView):
 
         if not user.is_lojista:
             return Response({"error": "Este usuário não é lojista."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Se o perfil já existe, não criamos outro, mas garantimos que a comunidade exista
         if hasattr(user, 'lojista_profile'):
-            return Response({"error": "Este usuário já possui um perfil."}, status=status.HTTP_400_BAD_REQUEST)
+             # Opcional: Se quiser permitir re-tentar caso a comunidade tenha falhado antes, 
+             # remova este return e use user.lojista_profile abaixo.
+             return Response({"error": "Este usuário já possui um perfil."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Agora, o request.data conterá os campos de texto E os arquivos de imagem
         serializer = self.get_serializer(data=request.data, context={'user': user})
         serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
+        
+        # 1. Salva o perfil do lojista
+        lojista_profile = serializer.save()
 
-        return Response(
-            {"message": "Etapa 2 concluída. Perfil da empresa preenchido."},
-            status=status.HTTP_201_CREATED # 201 é o status correto para 'create'
+        # 2. CRIAÇÃO SEGURA DA COMUNIDADE
+        # Usamos get_or_create para evitar erros se ela já existir
+        Community.objects.get_or_create(
+            lojista=lojista_profile,
+            defaults={
+                'nome': f"Comunidade {lojista_profile.company_name}",
+                'descricao': f"Bem-vindo à comunidade oficial da {lojista_profile.company_name}! Aqui você encontra novidades e promoções."
+            }
         )
 
+        return Response(
+            {"message": "Etapa 2 concluída. Perfil e Comunidade criados com sucesso!"},
+            status=status.HTTP_201_CREATED
+        )
+    
     def perform_create(self, serializer):
-        # O ImageField (configurado no serializer ou model) agora
-        # usará o MEDIA_ROOT e salvará o arquivo na pasta correta.
         serializer.save()
 
 class Tela3LojistaEnderecoView(generics.UpdateAPIView):

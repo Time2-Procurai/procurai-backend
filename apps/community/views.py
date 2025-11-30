@@ -1,7 +1,8 @@
 from django.shortcuts import render
-from rest_framework import generics, permissions, status, views
+from rest_framework import generics, permissions, status, views, filters
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
 from apps.community.serializers.community_serializer import (
     CommunitySerializer,
@@ -19,15 +20,53 @@ from .serializers.comment_like_serializer import CurtidaSerializer, ComentarioSe
 
 
 
+class PublicacaoDetailView(generics.RetrieveAPIView):
+    """
+    Retorna os detalhes de uma publicação específica.
+    GET /api/community/publicacoes/<int:pk>/
+    """
+    queryset = Publicacao.objects.all()
+    serializer_class = PublicacaoSerializer
+    permission_classes = [permissions.AllowAny]
+
 class CommunityDetailView(generics.RetrieveAPIView):
+    """
+    Retorna os detalhes da comunidade. Se não existir, CRIA automaticamente.
+    """
     permission_classes = [permissions.AllowAny]
     serializer_class = CommunityDetailSerializer
 
     def get_object(self):
-        lojista_id = self.kwargs.get("lojista_id")
-        lojista = get_object_or_404(LojistaProfile, id=lojista_id)
-        return lojista.community
+        # O 'lojista_id' na URL é o ID do Usuário (User ID)
+        user_id = self.kwargs.get("lojista_id")
+        
+        # Busca o perfil pelo ID do usuário
+        lojista = get_object_or_404(LojistaProfile, user__id=user_id)
+        
+        # AUTO-REPAIR: Se a comunidade não existir, cria agora.
+        community, created = Community.objects.get_or_create(
+            lojista=lojista,
+            defaults={
+                'nome': f"Comunidade {lojista.company_name}",
+                'descricao': f"Bem-vindo à comunidade oficial da {lojista.company_name}!"
+            }
+        )
+        return community
+
+
+class AllPublicacoesListView(generics.ListAPIView):
+    """
+    Endpoint para listar TODAS as publicações do sistema (Feed Global).
+    GET /api/community/publicacoes/
+    """
+    # Busca todos os objetos e ordena do mais recente para o mais antigo
+    queryset = Publicacao.objects.all().order_by('-data_publicacao')
+    serializer_class = PublicacaoSerializer
+    permission_classes = [permissions.AllowAny] # Aberto para todos verem
     
+    # Configuração opcional de busca
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['titulo', 'descricao', 'autor__full_name', 'comunidade__nome']    
 # Seguir uma comunidade
 class FollowCommunityView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -103,12 +142,11 @@ class IsFollowingCommunityView(APIView):
         )
 
 class PublicacaoCreateView(generics.CreateAPIView):
-    
     serializer_class = PublicacaoSerializer
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser) # Permite upload de imagens
 
     def perform_create(self, serializer):
-
         # Apenas lojistas podem criar publicação
         if not self.request.user.is_lojista:
             raise PermissionDenied("Apenas lojistas podem criar publicações.")
@@ -116,15 +154,20 @@ class PublicacaoCreateView(generics.CreateAPIView):
         # Obtém o perfil do lojista
         lojista_profile = get_object_or_404(LojistaProfile, user=self.request.user)
 
-        # Obtém automaticamente a comunidade associada ao lojista
-        comunidade = lojista_profile.community
+        # AUTO-REPAIR: Garante que a comunidade existe antes de postar
+        comunidade, created = Community.objects.get_or_create(
+            lojista=lojista_profile,
+            defaults={
+                'nome': f"Comunidade {lojista_profile.company_name}",
+                'descricao': f"Bem-vindo à comunidade oficial da {lojista_profile.company_name}!"
+            }
+        )
 
-        # Salva a publicação com autor e comunidade definidos automaticamente
+        # Salva a publicação vinculada ao autor e à comunidade
         serializer.save(
             autor=self.request.user,
             comunidade=comunidade
         )
-
 
 
 class PublicacaoListView(generics.ListAPIView):
