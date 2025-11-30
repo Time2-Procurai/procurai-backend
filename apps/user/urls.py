@@ -38,5 +38,7 @@ urlpatterns = [
     
     # Rota para CONFIRMAR a nova senha (usada pela próxima tela do React)
     path('password_reset_confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    
+    
 ]
 

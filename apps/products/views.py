@@ -11,6 +11,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from apps.products.models import Product, Favorite
 from apps.products.serializers.favorite import FavoriteSerializer
 from django.shortcuts import get_object_or_404
+
 "Inserindo permissões para lojistas autenticados"
 class IsLojistaOrReadOnly(permissions.BasePermission):
     """
@@ -50,6 +51,9 @@ class ProductViewSet(generics.ListCreateAPIView, generics.RetrieveUpdateAPIView)
     permission_classes = [IsLojistaOrReadOnly, IsOwnerOrReadOnly]
     parser_classes = (MultiPartParser, FormParser) # (Garante que os parsers estão aqui)
 
+
+    filter_backends = [SearchFilter]
+    search_fields = ['name', 'description', 'category_name']
     # --- AJUSTE AQUI ---
     # Adicione este método 'get'
     def get(self, request, *args, **kwargs):

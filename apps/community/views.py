@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions, status, views
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
@@ -8,6 +8,7 @@ from apps.community.serializers.community_serializer import (
     CommunityDetailSerializer,
     CommunityFollowSerializer,
     CommunityFollowerSerializer,
+    CommunityFeedSerializer
 )
 from rest_framework.exceptions import PermissionDenied
 from .serializers.community_serializer import PublicacaoSerializer
@@ -208,3 +209,51 @@ class ListarComentariosView(generics.ListAPIView):
         publicacao_id = self.kwargs.get("publicacao_id")
         publicacao = get_object_or_404(Publicacao, id=publicacao_id)
         return publicacao.comentarios.all()
+
+
+class UserFollowingListView(generics.ListAPIView):
+    """
+    GET /api/community/following/
+    Retorna as comunidades que o usuário logado segue.
+    """
+    serializer_class = CommunityFeedSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Filtra comunidades onde o usuário atual está na lista de seguidores
+        return Community.objects.filter(seguidores=self.request.user)
+
+
+class FollowToggleView(views.APIView):
+    """
+    POST /api/community/<int:target_id>/follow/
+    Alterna (Seguir/Desseguir) uma comunidade.
+    Recebe o ID do LOJISTA (User ID), encontra a comunidade dele e segue.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, target_id):
+        try:
+            # 1. Encontra o perfil do lojista pelo ID do Usuário
+            lojista_profile = LojistaProfile.objects.get(user__id=target_id)
+            # 2. Encontra a comunidade desse lojista
+            community = Community.objects.get(lojista=lojista_profile)
+        except (LojistaProfile.DoesNotExist, Community.DoesNotExist):
+            return Response(
+                {"error": "Este lojista não possui uma comunidade ativa."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        user = request.user
+
+        # Lógica de Toggle (Seguir/Desseguir)
+        if user in community.seguidores.all():
+            community.seguidores.remove(user)
+            action = "unfollowed"
+            msg = f"Você deixou de seguir a comunidade {community.nome}."
+        else:
+            community.seguidores.add(user)
+            action = "followed"
+            msg = f"Você agora segue a comunidade {community.nome}!"
+
+        return Response({"status": action, "message": msg}, status=status.HTTP_200_OK)
