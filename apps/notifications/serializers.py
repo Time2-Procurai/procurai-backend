@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from notifications import Notification
+from .models import Notification 
 from django.contrib.humanize.templatetags.humanize import naturaltime
 
 class NotificationSerializer(serializers.ModelSerializer):
