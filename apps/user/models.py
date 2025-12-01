@@ -82,9 +82,6 @@ class LojistaProfile(models.Model):
 
     #Implementando a recuperação de senha por e-mail
 
-
-    #Implementando a recuperação de senha por e-mail
-
 class PasswordResetCode(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reset_codes')
     code = models.CharField(max_length=6)

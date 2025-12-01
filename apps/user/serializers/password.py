@@ -5,7 +5,6 @@ from django.contrib.auth import get_user_model
 from ..models import PasswordResetCode
 
 
-
 User = get_user_model()
 
 class PasswordChangeSerializer(serializers.Serializer):
