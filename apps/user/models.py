@@ -1,5 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils import timezone
+import random
 
 
 class User(AbstractUser):
@@ -76,3 +78,29 @@ class LojistaProfile(models.Model):
 
     def __str__(self):
         return f"Perfil de Lojista de {self.company_name}"
+    
+
+    #Implementando a recuperação de senha por e-mail
+
+
+    #Implementando a recuperação de senha por e-mail
+
+class PasswordResetCode(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reset_codes')
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_used = models.BooleanField(default=False)
+
+    def is_valid(self):
+        # O código expira em 15 minutos e não pode ter sido usado
+        now = timezone.now()
+        diff = now - self.created_at
+        return diff.total_seconds() < 900 and not self.is_used
+
+    @classmethod
+    def generate_code(cls, user):
+        # Gera código de 6 dígitos
+        code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+        # Invalida códigos anteriores não usados 
+        cls.objects.filter(user=user, is_used=False).update(is_used=True)
+        return cls.objects.create(user=user, code=code)

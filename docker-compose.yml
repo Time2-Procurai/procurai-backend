@@ -2,31 +2,36 @@ services:
   web:
     build: .
     container_name: procurai-backend
-    
-    # --- ADICIONE ESTA LINHA ---
-    # Força o Docker a usar o servidor de desenvolvimento, que
-    # obedece à regra static() do urls.py
     command: python manage.py runserver 0.0.0.0:8000
-    
+
     volumes:
       - .:/app
-      # --- ADICIONE ESTA LINHA ---
-      # Mapeia a pasta 'media' do seu PC para dentro do container
       - ./media:/app/media 
+
     ports:
       - "8080:8000"
+
     env_file:
       - .env
+
+    environment:
+      - EMAIL_USE_TLS=True
+      - EMAIL_PORT=587
+      - EMAIL_HOST=smtp-relay.brevo.com
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}
+      - KEY_SMTP=${KEY_SMTP}   
+
     depends_on:
       db:
         condition: service_healthy
+
     networks:
       procurai-network:
         aliases:
           - web
 
   db:
-    # (Seu serviço 'db' está perfeito, não mude nada)
     image: postgres:16-alpine
     container_name: procurai-database
     environment:

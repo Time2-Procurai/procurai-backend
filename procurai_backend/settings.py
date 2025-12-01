@@ -127,21 +127,25 @@ DATABASES = {
 }
 
 # Backend de console (apenas imprime o e-mail no terminal)
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend' # para imprimir no terminal: 'django.core.mail.backends.console.EmailBackend'
-#EMAIL_HOST_USER = 'noreply@procurai.com' # em produção, trocar por um e-mail real
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
-EMAIL_HOST = 'smtp-relay.brevo.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_USE_SSL = False
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST',)
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp-relay.brevo.com")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
 
-# A CHAVE SMTP que você gerou no painel (NÃO é a senha de login da conta!)
-EMAIL_HOST_PASSWORD = os.getenv('KEY_SMTP')
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "False") == "True"
 
-# O e-mail que aparecerá como remetente
-# (No plano gratuito, você deve verificar este e-mail no painel do Brevo)
-DEFAULT_FROM_EMAIL = 'noreply@procurai.com'
+# O e-mail VALIDADO no painel da Brevo (ex: seu Gmail)
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+
+# A CHAVE SMTP do Brevo (não é a API Key normal)
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+
+# Remetente que aparece para o usuário
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL",
+    "Procurai App <no-reply@procurai.com>"
+)
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
