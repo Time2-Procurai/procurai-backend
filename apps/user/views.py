@@ -13,7 +13,7 @@ from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
 from django.conf import settings
 from django.shortcuts import get_object_or_404
-from .models import User, LojistaProfile
+from .models import User, LojistaProfile ,PasswordResetCode
 from .serializers.profile import ClienteProfileSerializer,UserListSerializer
 from .serializers.profile import Tela3LojistaEnderecoSerealizer
 from .serializers.profile import Tela2LojistaSerializer
@@ -23,10 +23,14 @@ from apps.user.serializers.deleteUser import UserBasicSerializer
 from .serializers.profile import UserDataSerializer,ClienteProfileRegistrationSerializer,LojistaProfileDataSerializer,ClienteProfileDataSerializer
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from .serializers.password import PasswordChangeSerializer
+from .serializers.password import PasswordChangeSerializer, PasswordResetConfirmCodeSerializer,PasswordResetRequestSerializer, PasswordResetValidateCodeSerializer
 from .serializers.serializers import UserDetailSerializer
 from rest_framework.filters import SearchFilter
-from .serializers.serializers import UserDetailSerializer 
+
+from django.contrib.auth import get_user_model
+
+
+
 from rest_framework.permissions import AllowAny
 from apps.community.models import Community
 class ClienteProfileRegistrationView(generics.UpdateAPIView):
@@ -453,3 +457,78 @@ class PasswordResetConfirmView(APIView):
             return Response({"message": "Senha alterada com sucesso!"}, status=status.HTTP_200_OK)
         
         return Response({"error": "Token inválido ou expirado"}, status=status.HTTP_400_BAD_REQUEST)   
+    
+
+### viewm pra resetar senha via codigo
+
+class PasswordResetRequestView1(APIView):
+    """
+    Recebe o e-mail e envia um código de 6 dígitos.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data['email']
+        
+        try:
+            user = User.objects.get(email=email)
+            
+            # Gera e salva o código
+            reset_code = PasswordResetCode.generate_code(user)
+
+            # Envia o E-mail
+            send_mail(
+                subject="Recuperação de Senha - PROCURAÍ",
+                message=f"Olá {user.full_name},\n\nSeu código de recuperação é: {reset_code.code}\n\nEste código expira em 15 minutos.",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[email],
+                fail_silently=False,
+            )
+        except User.DoesNotExist:
+            # Por segurança, fingimos que deu certo para não revelar se o e-mail existe
+            pass
+
+        return Response({"message": "O código foi enviado para o email."}, status=status.HTTP_200_OK)
+
+
+class PasswordResetConfirmView1(APIView):
+    """
+    Recebe código e nova senha. Verifica e altera.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = PasswordResetConfirmCodeSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.validated_data['user']
+            reset_code = serializer.validated_data['reset_code']
+            new_password = serializer.validated_data['password']
+
+            # Altera a senha
+            user.set_password(new_password)
+            user.save()
+
+            # Marca o código como usado
+            reset_code.is_used = True
+            reset_code.save()
+
+            return Response({"message": "Senha alterada com sucesso!"}, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PasswordResetValidateCodeView(APIView):
+    """
+    Valida se o código recebido pelo usuário é válido.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = PasswordResetValidateCodeSerializer(data=request.data)
+        if serializer.is_valid():
+            reset_code = serializer.reset_code
+            return Response({"message": "Código válido", "user_id": reset_code.user.id})
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
