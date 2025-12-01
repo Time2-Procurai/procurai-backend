@@ -28,6 +28,7 @@ urlpatterns = [
     path('api/evaluations/', include('apps.evaluation.urls')),
     path('user/', include('apps.user.urls', namespace='user')),
     path('api/community/', include('apps.community.urls')),
+    path('api/notifications/', include('apps.notifications.urls')),
 ]
 
 if settings.DEBUG:

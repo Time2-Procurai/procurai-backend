@@ -14,5 +14,7 @@ urlpatterns = [
     path('favorites/', views.UserFavoritesListView.as_view(), name='user-favorites-list'),
     
     # Rota para favoritar/desfavoritar (Toggle)
-    path('favorite/<int:product_id>/', views.ToggleFavoriteView.as_view(), name='toggle-favorite')
+    path('favorite/<int:product_id>/', views.ToggleFavoriteView.as_view(), name='toggle-favorite'),
+    path('favorites/all/', views.AllFavoritesListView.as_view(), name='all-favorites-list'), # Todos os Favoritos (Admin)
+    path('favorites/user/<int:user_id>/', views.FavoritesByUserIdView.as_view(), name='favorites-by-user-id'),
 ]

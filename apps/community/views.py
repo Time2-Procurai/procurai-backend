@@ -1,32 +1,82 @@
 from django.shortcuts import render
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions, status, views, filters, viewsets
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
 from apps.community.serializers.community_serializer import (
     CommunitySerializer,
     CommunityDetailSerializer,
     CommunityFollowSerializer,
     CommunityFollowerSerializer,
+    CommunityFeedSerializer,
+     PublicacaoSerializer
 )
 from rest_framework.exceptions import PermissionDenied
 from .serializers.community_serializer import PublicacaoSerializer
-from apps.community.models import Community, Publicacao
+from apps.community.models import (
+    Community, Publicacao, Curtida, Comentario, 
+    Enquete, OpcaoEnquete, VotoEnquete
+)
 from apps.user.models import User, LojistaProfile
 from apps.community.models import Community, Publicacao, Curtida, Comentario
 from .serializers.comment_like_serializer import CurtidaSerializer, ComentarioSerializer
+from apps.community.serializers.enquete_serializer import (
+    EnqueteSerializer, 
+    CriarEnqueteSerializer, 
+    VotoEnqueteSerializer
+)
 
 
+class PublicacaoDetailView(generics.RetrieveAPIView):
+    """
+    Retorna os detalhes de uma publicação específica.
+    GET /api/community/publicacoes/<int:pk>/
+    """
+    queryset = Publicacao.objects.all()
+    serializer_class = PublicacaoSerializer
+    permission_classes = [permissions.AllowAny]
 
 class CommunityDetailView(generics.RetrieveAPIView):
+    """
+    Retorna os detalhes da comunidade. Se não existir, CRIA automaticamente.
+    """
     permission_classes = [permissions.AllowAny]
     serializer_class = CommunityDetailSerializer
 
     def get_object(self):
-        lojista_id = self.kwargs.get("lojista_id")
-        lojista = get_object_or_404(LojistaProfile, id=lojista_id)
-        return lojista.community
+        # O 'lojista_id' na URL é o ID do Usuário (User ID)
+        user_id = self.kwargs.get("lojista_id")
+        
+        # Busca o perfil pelo ID do usuário
+        lojista = get_object_or_404(LojistaProfile, user__id=user_id)
+        
+        # AUTO-REPAIR: Se a comunidade não existir, cria agora.
+        community, created = Community.objects.get_or_create(
+            lojista=lojista,
+            defaults={
+                'nome': f"Comunidade {lojista.company_name}",
+                'descricao': f"Bem-vindo à comunidade oficial da {lojista.company_name}!"
+            }
+        )
+        return community
+
+
+class AllPublicacoesListView(generics.ListAPIView):
+    """
+    Endpoint para listar TODAS as publicações do sistema (Feed Global).
+    GET /api/community/publicacoes/
+    """
+    # Busca todos os objetos e ordena do mais recente para o mais antigo
+    queryset = Publicacao.objects.all().order_by('-data_publicacao')
+    serializer_class = PublicacaoSerializer
+    permission_classes = [permissions.AllowAny] # Aberto para todos verem
     
+    # Configuração opcional de busca
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['titulo', 'descricao', 'autor__full_name', 'comunidade__nome']    
 # Seguir uma comunidade
 class FollowCommunityView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -36,17 +86,14 @@ class FollowCommunityView(APIView):
 
         if request.user in community.seguidores.all():
             return Response(
-                {"message": "Você já está seguindo esta comunidade.", "seguindo": True},
+                {"message": "Você já segue esta comunidade.", "seguindo": True},
                 status=status.HTTP_200_OK,
             )
       
         community.seguidores.add(request.user)
         community.save()
 
-        return Response(
-            {"message": "Você está agora seguindo esta comunidade.", "seguindo": True},
-            status=status.HTTP_200_OK
-        )
+        return Response({"message": "Agora você segue esta comunidade.", "seguindo": True}, status=status.HTTP_200_OK)
    
 class UnfollowCommunityView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -56,7 +103,7 @@ class UnfollowCommunityView(APIView):
 
         if request.user not in community.seguidores.all():
             return Response(
-                {"message": "Você não está seguindo esta comunidade.", "seguindo": False},
+                {"message": "Você não segue esta comunidade.", "seguindo": False},
                 status=status.HTTP_200_OK,
             )
       
@@ -64,7 +111,7 @@ class UnfollowCommunityView(APIView):
         community.save()
 
         return Response(
-            {"message": "Você deixou de seguir esta comunidade.", "seguindo": False},
+            {"message": "Deixou de seguir a comunidade.", "seguindo": False},
             status=status.HTTP_200_OK
         )
     
@@ -74,7 +121,7 @@ class CommunityFollowersListView(generics.ListAPIView):
 
     def get_queryset(self):
         community_id = self.kwargs.get("community_id")
-        community = get_object_or_404(Community, id=community_id)
+        community = get_object_or_404(Community, id=self.kwargs.get("community_id"))
         return community.seguidores.all()
     
 class SuggestedCommunitiesView(generics.ListAPIView):
@@ -102,12 +149,11 @@ class IsFollowingCommunityView(APIView):
         )
 
 class PublicacaoCreateView(generics.CreateAPIView):
-    
     serializer_class = PublicacaoSerializer
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser) # Permite upload de imagens
 
     def perform_create(self, serializer):
-
         # Apenas lojistas podem criar publicação
         if not self.request.user.is_lojista:
             raise PermissionDenied("Apenas lojistas podem criar publicações.")
@@ -115,16 +161,20 @@ class PublicacaoCreateView(generics.CreateAPIView):
         # Obtém o perfil do lojista
         lojista_profile = get_object_or_404(LojistaProfile, user=self.request.user)
 
-        # Obtém automaticamente a comunidade associada ao lojista
-        comunidade = lojista_profile.community
-
-        # Salva a publicação com autor e comunidade definidos automaticamente
-        serializer.save(
-            autor=self.request.user,
-            comunidade=comunidade
+        # AUTO-REPAIR: Garante que a comunidade existe antes de postar
+        comunidade, created = Community.objects.get_or_create(
+            lojista=lojista_profile,
+            defaults={
+                'nome': f"Comunidade {lojista_profile.company_name}",
+                'descricao': f"Bem-vindo à comunidade oficial da {lojista_profile.company_name}!"
+            }
         )
 
-
+        # Salva a publicação vinculada ao autor e à comunidade
+        serializer.save(
+            autor=self.request.user, 
+            comunidade=lojista_profile.community
+        )
 
 class PublicacaoListView(generics.ListAPIView):
     serializer_class = PublicacaoSerializer
@@ -151,7 +201,7 @@ class CurtirPublicacaoView(APIView):
         Curtida.objects.create(publicacao=publicacao, usuario=request.user)
 
         return Response(
-            {"message": "Publicação curtida com sucesso."},
+            {"message": "Curtido com sucesso."},
             status=status.HTTP_201_CREATED
         )
 
@@ -170,7 +220,7 @@ class DescurtirPublicacaoView(APIView):
             )
         
         curtida.delete()
-
+        
         return Response(
             {"message": "Curtida removida."},
             status=status.HTTP_200_OK
@@ -185,7 +235,7 @@ class ComentarPublicacaoView(APIView):
         texto = request.data.get("texto")
         if not texto:
             return Response(
-                {"error": "Texto do comentário é obrigatório."},
+                {"error": "Texto obrigatório."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -208,3 +258,122 @@ class ListarComentariosView(generics.ListAPIView):
         publicacao_id = self.kwargs.get("publicacao_id")
         publicacao = get_object_or_404(Publicacao, id=publicacao_id)
         return publicacao.comentarios.all()
+
+
+class UserFollowingListView(generics.ListAPIView):
+    """
+    GET /api/community/following/
+    Retorna as comunidades que o usuário logado segue.
+    """
+    serializer_class = CommunityFeedSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Filtra comunidades onde o usuário atual está na lista de seguidores
+        return Community.objects.filter(seguidores=self.request.user)
+
+
+class FollowToggleView(views.APIView):
+    """
+    POST /api/community/<int:target_id>/follow/
+    Alterna (Seguir/Desseguir) uma comunidade.
+    Recebe o ID do LOJISTA (User ID), encontra a comunidade dele e segue.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, target_id):
+        try:
+            # 1. Encontra o perfil do lojista pelo ID do Usuário
+            lojista_profile = LojistaProfile.objects.get(user__id=target_id)
+            # 2. Encontra a comunidade desse lojista
+            community = Community.objects.get(lojista=lojista_profile)
+        except (LojistaProfile.DoesNotExist, Community.DoesNotExist):
+            return Response(
+                {"error": "Este lojista não possui uma comunidade ativa."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        user = request.user
+
+        # Lógica de Toggle (Seguir/Desseguir)
+        if user in community.seguidores.all():
+            community.seguidores.remove(user)
+            action = "unfollowed"
+            msg = f"Você deixou de seguir a comunidade {community.nome}."
+        else:
+            community.seguidores.add(user)
+            action = "followed"
+            msg = f"Você agora segue a comunidade {community.nome}!"
+
+        return Response({"status": action, "message": msg}, status=status.HTTP_200_OK)
+    
+class EnqueteViewSet(viewsets.ModelViewSet):
+    """
+    Gerencia Listagem, Criação, Detalhes e Votação de Enquetes.
+    Substitui: CriarEnqueteView, ListarEnquetesView, Detalhar, Votar, Resultado.
+    """
+    # Traz opções junto para evitar query extra 
+    queryset = Enquete.objects.all().prefetch_related('opcoes').order_by('-criada_em')
+    
+    # Permite filtrar por comunidade na URL: /api/enquetes/?comunidade=ID
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['comunidade'] 
+
+    def get_permissions(self):
+        """Define permissões dinamicamente baseadas na ação."""
+        if self.action in ['create', 'destroy', 'update', 'partial_update']:
+            # Apenas autenticados (e lojistas, verificado no perform_create)
+            return [permissions.IsAuthenticated()]
+        elif self.action == 'votar':
+            return [permissions.IsAuthenticated()]
+        else:
+            # Listar e Detalhar é público
+            return [permissions.AllowAny()]
+
+    def get_serializer_class(self):
+        """Troca o serializer dependendo da operação."""
+        if self.action == 'create':
+            return CriarEnqueteSerializer
+        if self.action == 'votar':
+            return VotoEnqueteSerializer
+        # Para list e retrieve, usa o completo (com contagem de votos)
+        return EnqueteSerializer
+
+    def perform_create(self, serializer):
+        """
+        Injeta automaticamente o autor e a comunidade ao criar.
+        """
+        user = self.request.user
+        if not user.is_lojista:
+            raise PermissionDenied("Apenas lojistas podem criar enquetes.")
+        
+        lojista = get_object_or_404(LojistaProfile, user=user)
+        serializer.save(autor=user, comunidade=lojista.community)
+
+    def create(self, request, *args, **kwargs):
+        """
+        Sobrescrita opcional para retornar o JSON completo (com ID e Total Votos)
+        após a criação, em vez de apenas os dados de entrada.
+        """
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        enquete = serializer.save() # Chama perform_create internamente
+        
+        # Serializa a resposta com o serializer de leitura (mais bonito para o front)
+        read_serializer = EnqueteSerializer(enquete)
+        return Response(read_serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'])
+    def votar(self, request, pk=None):
+        """
+        Endpoint: POST /api/enquetes/{id}/votar/
+        Body: { "opcao_id": 5 }
+        """
+        serializer = VotoEnqueteSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        
+        return Response(
+            {"message": "Voto computado com sucesso!"}, 
+            status=status.HTTP_201_CREATED
+        )

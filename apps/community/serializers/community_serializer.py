@@ -54,7 +54,31 @@ class CommunityFollowerSerializer(serializers.ModelSerializer):
             "username",
             "email",
         ]
+class CommunityFeedSerializer(serializers.ModelSerializer):
+    """
+    Serializer para listar comunidades no Feed (seção 'Minhas Comunidades').
+    Mapeia os campos da Comunidade para os campos que o Frontend (Card de Empresa) espera.
+    """
+    # Retornamos o ID do USUÁRIO (Lojista) como 'id', para manter a navegação /perfil/empresa/{id}
+    id = serializers.IntegerField(source='lojista.user.id', read_only=True)
+    
+    # Mapeia o nome da comunidade para 'full_name' (padrão do card de empresa)
+    full_name = serializers.CharField(source='nome', read_only=True)
+    
+    # Pega a foto do perfil do lojista
+    profile_picture = serializers.ImageField(source='lojista.profile_picture', read_only=True)
+    
+    # Pega a categoria da empresa
+    company_category = serializers.CharField(source='lojista.company_category', read_only=True)
 
+    # Pega o número de seguidores (propriedade do model)
+    numero_de_seguidores = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Community
+        fields = ['id', 'full_name', 'profile_picture', 'company_category', 'numero_de_seguidores']
+        
+        
 class PublicacaoSerializer(serializers.ModelSerializer):
     autor_email = serializers.ReadOnlyField(source='autor.email') 
     comunidade_id = serializers.ReadOnlyField(source='comunidade.id')  
