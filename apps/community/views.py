@@ -1,7 +1,9 @@
 from django.shortcuts import render
-from rest_framework import generics, permissions, status, views, filters
+from rest_framework import generics, permissions, status, views, filters, viewsets
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
 from apps.community.serializers.community_serializer import (
@@ -9,15 +11,23 @@ from apps.community.serializers.community_serializer import (
     CommunityDetailSerializer,
     CommunityFollowSerializer,
     CommunityFollowerSerializer,
-    CommunityFeedSerializer
+    CommunityFeedSerializer,
+     PublicacaoSerializer
 )
 from rest_framework.exceptions import PermissionDenied
 from .serializers.community_serializer import PublicacaoSerializer
-from apps.community.models import Community, Publicacao
+from apps.community.models import (
+    Community, Publicacao, Curtida, Comentario, 
+    Enquete, OpcaoEnquete, VotoEnquete
+)
 from apps.user.models import User, LojistaProfile
 from apps.community.models import Community, Publicacao, Curtida, Comentario
 from .serializers.comment_like_serializer import CurtidaSerializer, ComentarioSerializer
-
+from apps.community.serializers.enquete_serializer import (
+    EnqueteSerializer, 
+    CriarEnqueteSerializer, 
+    VotoEnqueteSerializer
+)
 
 
 class PublicacaoDetailView(generics.RetrieveAPIView):
@@ -76,17 +86,14 @@ class FollowCommunityView(APIView):
 
         if request.user in community.seguidores.all():
             return Response(
-                {"message": "Você já está seguindo esta comunidade.", "seguindo": True},
+                {"message": "Você já segue esta comunidade.", "seguindo": True},
                 status=status.HTTP_200_OK,
             )
       
         community.seguidores.add(request.user)
         community.save()
 
-        return Response(
-            {"message": "Você está agora seguindo esta comunidade.", "seguindo": True},
-            status=status.HTTP_200_OK
-        )
+        return Response({"message": "Agora você segue esta comunidade.", "seguindo": True}, status=status.HTTP_200_OK)
    
 class UnfollowCommunityView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -96,7 +103,7 @@ class UnfollowCommunityView(APIView):
 
         if request.user not in community.seguidores.all():
             return Response(
-                {"message": "Você não está seguindo esta comunidade.", "seguindo": False},
+                {"message": "Você não segue esta comunidade.", "seguindo": False},
                 status=status.HTTP_200_OK,
             )
       
@@ -104,7 +111,7 @@ class UnfollowCommunityView(APIView):
         community.save()
 
         return Response(
-            {"message": "Você deixou de seguir esta comunidade.", "seguindo": False},
+            {"message": "Deixou de seguir a comunidade.", "seguindo": False},
             status=status.HTTP_200_OK
         )
     
@@ -114,7 +121,7 @@ class CommunityFollowersListView(generics.ListAPIView):
 
     def get_queryset(self):
         community_id = self.kwargs.get("community_id")
-        community = get_object_or_404(Community, id=community_id)
+        community = get_object_or_404(Community, id=self.kwargs.get("community_id"))
         return community.seguidores.all()
     
 class SuggestedCommunitiesView(generics.ListAPIView):
@@ -165,10 +172,9 @@ class PublicacaoCreateView(generics.CreateAPIView):
 
         # Salva a publicação vinculada ao autor e à comunidade
         serializer.save(
-            autor=self.request.user,
-            comunidade=comunidade
+            autor=self.request.user, 
+            comunidade=lojista_profile.community
         )
-
 
 class PublicacaoListView(generics.ListAPIView):
     serializer_class = PublicacaoSerializer
@@ -195,7 +201,7 @@ class CurtirPublicacaoView(APIView):
         Curtida.objects.create(publicacao=publicacao, usuario=request.user)
 
         return Response(
-            {"message": "Publicação curtida com sucesso."},
+            {"message": "Curtido com sucesso."},
             status=status.HTTP_201_CREATED
         )
 
@@ -214,7 +220,7 @@ class DescurtirPublicacaoView(APIView):
             )
         
         curtida.delete()
-
+        
         return Response(
             {"message": "Curtida removida."},
             status=status.HTTP_200_OK
@@ -229,7 +235,7 @@ class ComentarPublicacaoView(APIView):
         texto = request.data.get("texto")
         if not texto:
             return Response(
-                {"error": "Texto do comentário é obrigatório."},
+                {"error": "Texto obrigatório."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -300,3 +306,74 @@ class FollowToggleView(views.APIView):
             msg = f"Você agora segue a comunidade {community.nome}!"
 
         return Response({"status": action, "message": msg}, status=status.HTTP_200_OK)
+    
+class EnqueteViewSet(viewsets.ModelViewSet):
+    """
+    Gerencia Listagem, Criação, Detalhes e Votação de Enquetes.
+    Substitui: CriarEnqueteView, ListarEnquetesView, Detalhar, Votar, Resultado.
+    """
+    # Traz opções junto para evitar query extra 
+    queryset = Enquete.objects.all().prefetch_related('opcoes').order_by('-criada_em')
+    
+    # Permite filtrar por comunidade na URL: /api/enquetes/?comunidade=ID
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['comunidade'] 
+
+    def get_permissions(self):
+        """Define permissões dinamicamente baseadas na ação."""
+        if self.action in ['create', 'destroy', 'update', 'partial_update']:
+            # Apenas autenticados (e lojistas, verificado no perform_create)
+            return [permissions.IsAuthenticated()]
+        elif self.action == 'votar':
+            return [permissions.IsAuthenticated()]
+        else:
+            # Listar e Detalhar é público
+            return [permissions.AllowAny()]
+
+    def get_serializer_class(self):
+        """Troca o serializer dependendo da operação."""
+        if self.action == 'create':
+            return CriarEnqueteSerializer
+        if self.action == 'votar':
+            return VotoEnqueteSerializer
+        # Para list e retrieve, usa o completo (com contagem de votos)
+        return EnqueteSerializer
+
+    def perform_create(self, serializer):
+        """
+        Injeta automaticamente o autor e a comunidade ao criar.
+        """
+        user = self.request.user
+        if not user.is_lojista:
+            raise PermissionDenied("Apenas lojistas podem criar enquetes.")
+        
+        lojista = get_object_or_404(LojistaProfile, user=user)
+        serializer.save(autor=user, comunidade=lojista.community)
+
+    def create(self, request, *args, **kwargs):
+        """
+        Sobrescrita opcional para retornar o JSON completo (com ID e Total Votos)
+        após a criação, em vez de apenas os dados de entrada.
+        """
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        enquete = serializer.save() # Chama perform_create internamente
+        
+        # Serializa a resposta com o serializer de leitura (mais bonito para o front)
+        read_serializer = EnqueteSerializer(enquete)
+        return Response(read_serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'])
+    def votar(self, request, pk=None):
+        """
+        Endpoint: POST /api/enquetes/{id}/votar/
+        Body: { "opcao_id": 5 }
+        """
+        serializer = VotoEnqueteSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        
+        return Response(
+            {"message": "Voto computado com sucesso!"}, 
+            status=status.HTTP_201_CREATED
+        )

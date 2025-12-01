@@ -1,9 +1,21 @@
-from django.urls import path
 from . import views
-
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import (
+    CommunityDetailView,
+    CurtirPublicacaoView,
+    DescurtirPublicacaoView,
+    ComentarPublicacaoView,
+    ListarComentariosView,
+    EnqueteViewSet 
+)
 app_name = 'community'
+router = DefaultRouter()
+router.register(r'enquetes', EnqueteViewSet, basename='enquete')
 
 urlpatterns = [
+    
+    path('', include(router.urls)),
     # Detalhes da comunidade
     path('lojista/<int:lojista_id>/', views.CommunityDetailView.as_view(), name='community-detail'),
 

@@ -1,4 +1,4 @@
-from rest_framework import viewsets, permissions, generics, views
+from rest_framework import viewsets, permissions, generics, views, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django_filters import rest_framework as filters
@@ -131,21 +131,20 @@ class ToggleFavoriteView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, product_id):
-        # Verifica se é um cliente (opcional, se sua regra de negócio exigir)
-        if not request.user.is_cliente:
+        # Verifica se é cliente
+        if not getattr(request.user, 'is_cliente', False):
              return Response({"error": "Apenas clientes podem favoritar produtos."}, status=status.HTTP_403_FORBIDDEN)
 
         product = get_object_or_404(Product, id=product_id)
         
-        # Tenta buscar o favorito existente
+        # get_or_create retorna uma tupla (objeto, criado?)
         favorite_item, created = Favorite.objects.get_or_create(user=request.user, product=product)
 
         if not created:
-            # Se já existia (created=False), então o usuário quer remover (desfavoritar)
+            # Se já existia, o usuário quer remover
             favorite_item.delete()
             return Response({"message": "Produto removido dos favoritos.", "is_favorited": False}, status=status.HTTP_200_OK)
         
-        # Se foi criado agora
         return Response({"message": "Produto adicionado aos favoritos.", "is_favorited": True}, status=status.HTTP_201_CREATED)
 
 
@@ -156,11 +155,36 @@ class UserFavoritesListView(generics.ListAPIView):
     """
     serializer_class = FavoriteSerializer
     permission_classes = [permissions.IsAuthenticated] # Obrigatório estar logado
+    pagination_class = None 
+    def get_queryset(self):
+        # Isso é o mais seguro: confia apenas no token validado
+        return Favorite.objects.filter(user=self.request.user)
 
-    def get_queryset(self):        
-        # Filtra os favoritos onde o campo 'user' é igual ao usuário da requisição (request.user)
-        # O request.user é determinado automaticamente pelo Token enviado no cabeçalho.
-        return Favorite.objects.filter(user=self.request.user).order_by('-created_at')
+class AllFavoritesListView(generics.ListAPIView):
+    """
+    Lista TODOS os favoritos do sistema (apenas para Admin).
+    GET /api/products/favorites/all/
+    """
+    queryset = Favorite.objects.all().order_by('-created_at')
+    serializer_class = FavoriteSerializer
+    permission_classes = [permissions.AllowAny] # Segurança: Apenas admin pode ver tudo
+
+class FavoritesByUserIdView(generics.ListAPIView):
+    """
+    Lista os favoritos de um usuário específico passado na URL.
+    GET /api/products/favorites/user/<user_id>/
+    """
+    serializer_class = FavoriteSerializer
+    # Recomendado: IsAdminUser para que apenas admins vejam listas de outros.
+    # Se quiser liberar geral, use IsAuthenticated.
+    permission_classes = [permissions.IsAuthenticated] 
+
+    def get_queryset(self):
+        # Pega o ID da URL
+        target_user_id = self.kwargs.get('user_id')
+        
+        # Filtra os favoritos daquele usuário específico
+        return Favorite.objects.filter(user__id=target_user_id).order_by('-created_at')
 
 class ProductFilter(filters.FilterSet):
     """

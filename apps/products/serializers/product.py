@@ -6,18 +6,17 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = [
-            'id', 'name', 'description', 'price', 'is_negotiable',
+            'id', 'name', 'description', 'price', 'is_promotion', 'old_price', 'is_negotiable',
             'category_name', 'is_service', 
-            'product_image', # Assumindo que você adicionou
+            'product_image', 
             'available', 'owner_id', 'created_at', 'updated_at'
         ]
         
-        # --- AJUSTE AQUI ---
-        # Mova os campos que o servidor define para 'read_only_fields'
+       
         read_only_fields = (
             'id', 
             'owner_id', 
             'created_at', 
             'updated_at', 
-            'available' # <-- O MAIS IMPORTANTE
+            'available' 
         )

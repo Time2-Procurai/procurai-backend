@@ -44,6 +44,12 @@ class Product(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Data de Criação')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Data de Atualização')
     available = models.BooleanField(default=True, verbose_name='Disponível para Venda')
+    is_promotion = models.BooleanField(default=False, verbose_name='Em Promoção')
+    old_price = models.DecimalField(
+        max_digits=10, decimal_places=2, 
+        null=True, blank=True, 
+        verbose_name='Preço Antigo (Sem desconto)'
+    )
     owner_id = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
