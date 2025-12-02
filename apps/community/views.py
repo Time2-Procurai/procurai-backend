@@ -114,7 +114,39 @@ class UnfollowCommunityView(APIView):
             {"message": "Deixou de seguir a comunidade.", "seguindo": False},
             status=status.HTTP_200_OK
         )
+
+class FollowToggleView(views.APIView):
+    """
+    Segue ou deixa de seguir uma comunidade.
+    A URL deve passar o 'target_id' que é o ID do USUÁRIO (Lojista).
+    POST /api/community/<int:target_id>/follow/
+    """
+    permission_classes = [permissions.IsAuthenticated]
     
+    def post(self, request, target_id):
+        try:
+            # Busca a comunidade através do User ID do lojista
+            lojista_profile = LojistaProfile.objects.get(user__id=target_id)
+            community = Community.objects.get(lojista=lojista_profile)
+        except (LojistaProfile.DoesNotExist, Community.DoesNotExist):
+            return Response({"error": "Comunidade não encontrada."}, status=status.HTTP_404_NOT_FOUND)
+        
+        user = request.user
+        
+        # Verifica se já segue
+        if user in community.seguidores.all():
+            # Se já segue, remove (unfollow)
+            community.seguidores.remove(user)
+            action = "unfollowed"
+            msg = "Você deixou de seguir esta comunidade."
+        else:
+            # Se não segue, adiciona (follow)
+            community.seguidores.add(user)
+            action = "followed"
+            msg = "Você começou a seguir esta comunidade!"
+        
+        return Response({"status": action, "message": msg}, status=status.HTTP_200_OK)
+  
 class CommunityFollowersListView(generics.ListAPIView):
     permission_classes = [permissions.AllowAny]
     serializer_class = CommunityFollowerSerializer

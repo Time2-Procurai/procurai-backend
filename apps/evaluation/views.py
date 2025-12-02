@@ -75,3 +75,15 @@ class StoreEvaluationView(generics.ListCreateAPIView):
             {"message": "Avaliação criada com sucesso.", "data": serializer.data},
             status=status.HTTP_201_CREATED
         )
+        
+class UserEvaluationsListView(generics.ListAPIView):
+    """
+    Lista todas as avaliações feitas por um usuário específico.
+    GET /api/evaluations/user/<user_id>/
+    """
+    serializer_class = EvaluationSerializer
+    permission_classes = [permissions.AllowAny] # Público
+
+    def get_queryset(self):
+        user_id = self.kwargs.get('user_id')
+        return Evaluation.objects.filter(user__id=user_id).order_by('-created_at')

@@ -7,7 +7,8 @@ from .views import (
     DescurtirPublicacaoView,
     ComentarPublicacaoView,
     ListarComentariosView,
-    EnqueteViewSet 
+    EnqueteViewSet,
+    FollowToggleView
 )
 app_name = 'community'
 router = DefaultRouter()
@@ -30,8 +31,8 @@ urlpatterns = [
     path('publicacoes/<int:publicacao_id>/comentarios/', views.ListarComentariosView.as_view(), name='publicacao-comentarios'),
      path('publicacoes/<int:pk>/', views.PublicacaoDetailView.as_view(), name='publicacao-detail'),
     # Seguir / Desseguir e Seguidores
-    path('<int:community_id>/follow/', views.FollowCommunityView.as_view(), name='community-follow'),
-    path('<int:community_id>/unfollow/', views.UnfollowCommunityView.as_view(), name='community-unfollow'),
+    path('<int:target_id>/follow/', views.FollowToggleView.as_view(), name='community-follow'),
+    path('<int:target_id>/unfollow/', views.FollowToggleView.as_view(), name='community-unfollow'),
     path('<int:community_id>/seguidores/', views.CommunityFollowersListView.as_view(), name='community-followers'),
     path('<int:community_id>/esta-seguindo/', views.IsFollowingCommunityView.as_view(), name='community-is-following'),
 

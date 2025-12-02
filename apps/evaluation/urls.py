@@ -12,4 +12,5 @@ urlpatterns = [
         views.StoreEvaluationView.as_view(),
         name='store-evaluations'
     ),
+    path('user/<int:user_id>/', views.UserEvaluationsListView.as_view(), name='user-evaluations'),
 ]

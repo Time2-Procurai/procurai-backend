@@ -532,3 +532,6 @@ class PasswordResetValidateCodeView(APIView):
             reset_code = serializer.reset_code
             return Response({"message": "Código válido", "user_id": reset_code.user.id})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
