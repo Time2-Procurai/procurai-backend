@@ -93,6 +93,7 @@ class Curtida(models.Model):
         related_name='curtidas'
     )
     data = models.DateTimeField(auto_now_add=True)
+    user_has_liked = models.BooleanField(default=True)
 
     class Meta:
         unique_together = ('publicacao', 'usuario')  # evita curtida duplicada

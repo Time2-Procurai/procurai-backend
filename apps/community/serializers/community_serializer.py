@@ -80,10 +80,47 @@ class CommunityFeedSerializer(serializers.ModelSerializer):
         
         
 class PublicacaoSerializer(serializers.ModelSerializer):
-    autor_email = serializers.ReadOnlyField(source='autor.email') 
-    comunidade_id = serializers.ReadOnlyField(source='comunidade.id')  
+    autor_email = serializers.ReadOnlyField(source='autor.email')
+    comunidade_id = serializers.ReadOnlyField(source='comunidade.id')
+
+    # Campos calculados
+    likes = serializers.SerializerMethodField()
+    user_has_liked = serializers.SerializerMethodField()
 
     class Meta:
         model = Publicacao
-        fields = ['id', 'comunidade_id', 'autor', 'autor_email', 'titulo', 'descricao', 'imagem', 'data_publicacao']
-        read_only_fields = ['id', 'autor', 'data_publicacao', 'comunidade_id']
+        fields = [
+            'id',
+            'comunidade_id',
+            'autor',
+            'autor_email',
+            'titulo',
+            'descricao',
+            'imagem',
+            'data_publicacao',
+            'likes',
+            'user_has_liked',   # <== AGORA é válido
+        ]
+        read_only_fields = [
+            'id',
+            'autor',
+            'data_publicacao',
+            'comunidade_id',
+        ]
+
+    def get_likes(self, obj):
+        # conta curtidas com user_has_liked=True
+        return obj.curtidas.filter(user_has_liked=True).count()
+
+    def get_user_has_liked(self, obj):
+        request = self.context.get("request")
+
+        # Retorna false para usuários não autenticados
+        if not request or not request.user.is_authenticated:
+            return False
+
+        # Verifica se o usuário logado curtiu
+        return obj.curtidas.filter(
+            usuario=request.user,
+            user_has_liked=True
+        ).exists()
