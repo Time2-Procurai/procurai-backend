@@ -1,6 +1,8 @@
 from django.db import models
 from django.conf import settings
 
+from apps.notifications.models import Notification
+
 # Create your models here.
 class Product(models.Model):
 
@@ -58,10 +60,29 @@ class Product(models.Model):
     )
 
     def save(self, *args, **kwargs):
+        # Detectar se é edição
+        if self.pk:
+            old = Product.objects.get(pk=self.pk)
+            old_is_promo = old.is_promotion
+        else:
+            old_is_promo = self.is_promotion  # Criando agora → não dispara nada
+
         super().save(*args, **kwargs)
 
-    def __str__(self):
-        return self.name
+        # Se antes não era promoção e agora é → criar notificações
+        if not old_is_promo and self.is_promotion:
+            self.create_promotion_notifications()
+    
+    def create_promotion_notifications(self):
+        # Usuários que favoritaram este produto
+        favorited_users = self.favorited_by.values_list('user', flat=True)
+
+        # Criar notificação para cada usuário
+        for user_id in favorited_users:
+            Notification.objects.create(
+                recipient_id=user_id,
+                message=f"O produto '{self.name}' entrou em promoção! Agora por R$ {self.price}."
+            )
     
 class Favorite(models.Model):
     user = models.ForeignKey(
