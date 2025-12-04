@@ -12,7 +12,8 @@ from apps.community.serializers.community_serializer import (
     CommunityFollowSerializer,
     CommunityFollowerSerializer,
     CommunityFeedSerializer,
-     PublicacaoSerializer
+    PublicacaoSerializer 
+    
 )
 from rest_framework.exceptions import PermissionDenied
 from .serializers.community_serializer import PublicacaoSerializer
@@ -342,70 +343,71 @@ class FollowToggleView(views.APIView):
 class EnqueteViewSet(viewsets.ModelViewSet):
     """
     Gerencia Listagem, Criação, Detalhes e Votação de Enquetes.
-    Substitui: CriarEnqueteView, ListarEnquetesView, Detalhar, Votar, Resultado.
     """
-    # Traz opções junto para evitar query extra 
     queryset = Enquete.objects.all().prefetch_related('opcoes').order_by('-criada_em')
-    
-    # Permite filtrar por comunidade na URL: /api/enquetes/?comunidade=ID
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['comunidade'] 
 
     def get_permissions(self):
-        """Define permissões dinamicamente baseadas na ação."""
         if self.action in ['create', 'destroy', 'update', 'partial_update']:
-            # Apenas autenticados (e lojistas, verificado no perform_create)
             return [permissions.IsAuthenticated()]
         elif self.action == 'votar':
             return [permissions.IsAuthenticated()]
         else:
-            # Listar e Detalhar é público
             return [permissions.AllowAny()]
 
     def get_serializer_class(self):
-        """Troca o serializer dependendo da operação."""
         if self.action == 'create':
             return CriarEnqueteSerializer
         if self.action == 'votar':
             return VotoEnqueteSerializer
-        # Para list e retrieve, usa o completo (com contagem de votos)
         return EnqueteSerializer
 
     def perform_create(self, serializer):
-        """
-        Injeta automaticamente o autor e a comunidade ao criar.
-        """
+        # Injeta a comunidade e o autor
         user = self.request.user
         if not user.is_lojista:
             raise PermissionDenied("Apenas lojistas podem criar enquetes.")
         
+        # Busca a comunidade do lojista logado
         lojista = get_object_or_404(LojistaProfile, user=user)
-        serializer.save(autor=user, comunidade=lojista.community)
+        
+        # --- PROTEÇÃO ROBUSTA: Garante que a comunidade existe ---
+        try:
+            comunidade = lojista.community
+        except Community.DoesNotExist:
+            # Se não existir (loja antiga), cria agora para não dar erro 500
+            comunidade = Community.objects.create(
+                lojista=lojista,
+                nome=f"Comunidade {lojista.company_name}",
+                descricao=f"Bem-vindo à comunidade oficial da {lojista.company_name}!"
+            )
+        
+        # Salva passando a comunidade encontrada/criada
+        serializer.save(autor=user, comunidade=comunidade)
 
     def create(self, request, *args, **kwargs):
-        """
-        Sobrescrita opcional para retornar o JSON completo (com ID e Total Votos)
-        após a criação, em vez de apenas os dados de entrada.
-        """
+        # Override para retornar a enquete formatada após criar
         serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
-        enquete = serializer.save() # Chama perform_create internamente
         
-        # Serializa a resposta com o serializer de leitura (mais bonito para o front)
+        # --- CORREÇÃO AQUI ---
+        # Chamamos perform_create EXPLICITAMENTE para injetar a comunidade.
+        # (Antes estava chamando serializer.save() direto, o que pulava a injeção)
+        self.perform_create(serializer)
+        
+        enquete = serializer.instance
+        
+        # Retorna usando o serializer de leitura (com IDs e votos)
         read_serializer = EnqueteSerializer(enquete)
         return Response(read_serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'])
     def votar(self, request, pk=None):
-        """
-        Endpoint: POST /api/enquetes/{id}/votar/
-        Body: { "opcao_id": 5 }
-        """
         serializer = VotoEnqueteSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        
-        return Response(
-            {"message": "Voto computado com sucesso!"}, 
-            status=status.HTTP_201_CREATED
-        )
+        return Response({"message": "Voto computado!"}, status=status.HTTP_201_CREATED)
+
+
+

@@ -10,12 +10,13 @@ class OpcaoEnqueteSerializer(serializers.ModelSerializer):
         model = OpcaoEnquete
         fields = ['id', 'texto', 'votos']
 
-
 class EnqueteSerializer(serializers.ModelSerializer):
     opcoes = OpcaoEnqueteSerializer(many=True, read_only=True)
     total_votos = serializers.SerializerMethodField()
     ativa = serializers.BooleanField(source='is_ativa', read_only=True)
     data_criacao = serializers.DateTimeField(source='criada_em', read_only=True)
+    # Adicionado para exibir nome do autor no feed
+    autor_nome = serializers.CharField(source='autor.full_name', read_only=True)
 
     class Meta:
         model = Enquete
@@ -23,6 +24,7 @@ class EnqueteSerializer(serializers.ModelSerializer):
             'id',
             'comunidade',
             'autor',
+            'autor_nome',
             'pergunta',
             'opcoes',
             'ativa',        
@@ -32,10 +34,8 @@ class EnqueteSerializer(serializers.ModelSerializer):
         ]
         
     def get_total_votos(self, obj):
-        # Soma otimizada usando o banco de dados ou lista pré-carregada
-        # Como temos related_name='opcoes', podemos somar:
+        # Soma otimizada usando o campo pré-calculado 'votos_count'
         return sum(opcao.votos_count for opcao in obj.opcoes.all())
-
 
 class CriarEnqueteSerializer(serializers.ModelSerializer):
     opcoes = serializers.ListField(
@@ -45,18 +45,21 @@ class CriarEnqueteSerializer(serializers.ModelSerializer):
         min_length=2,
         error_messages={'min_length': 'Informe pelo menos duas opções para a enquete.'}
     )
-
+    data_criacao = serializers.DateTimeField(source='criada_em', read_only=True)
     class Meta:
         model = Enquete
-        fields = ['comunidade', 'pergunta', 'opcoes', 'data_fim']
+        fields = ['comunidade', 'pergunta', 'opcoes', 'data_fim','data_criacao']
+        read_only_fields = ['comunidade']
 
     def create(self, validated_data):
         opcoes_texto = validated_data.pop('opcoes')
         
-        user = self.context['request'].user
+        # O 'user' já está dentro de validated_data['autor'] injetado pela View
         
         with transaction.atomic():
-            enquete = Enquete.objects.create(autor=user, **validated_data)
+            # --- CORREÇÃO AQUI ---
+            # Removido 'autor=user'. Usamos apenas **validated_data que já contém autor e comunidade.
+            enquete = Enquete.objects.create(**validated_data)
 
             opcoes_objs = [
                 OpcaoEnquete(enquete=enquete, texto=texto) 
@@ -65,10 +68,8 @@ class CriarEnqueteSerializer(serializers.ModelSerializer):
             OpcaoEnquete.objects.bulk_create(opcoes_objs)
 
         return enquete
-
-
+    
 class VotoEnqueteSerializer(serializers.ModelSerializer):
-    # O front manda apenas o ID da opção
     opcao_id = serializers.PrimaryKeyRelatedField(
         queryset=OpcaoEnquete.objects.all(),
         source='opcao',
@@ -87,11 +88,9 @@ class VotoEnqueteSerializer(serializers.ModelSerializer):
         if not enquete.is_ativa:
             raise serializers.ValidationError("Esta enquete já está encerrada.")
 
-        # Fazemos aqui para dar uma mensagem amigável (400) em vez de erro de banco (500)
         if VotoEnquete.objects.filter(enquete=enquete, usuario=user).exists():
             raise serializers.ValidationError("Você já votou nesta enquete.")
 
         attrs['usuario'] = user
         attrs['enquete'] = enquete
-        
         return attrs

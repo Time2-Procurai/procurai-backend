@@ -39,4 +39,22 @@ urlpatterns = [
     # Outras rotas
     path('sugeridas/', views.SuggestedCommunitiesView.as_view(), name='community-suggested'),
     path('following/', views.UserFollowingListView.as_view(), name='community-following'),
+    
+    # --- ROTAS PARA ENQUETES ---
+    # Listar e Criar (POST envia {pergunta, opcoes: []})
+    path('enquetes/', views.EnqueteViewSet.as_view({
+        'get': 'list',
+        'post': 'create'
+    }), name='enquete-list-create'),
+
+    # Votar (POST envia {opcao_id: 1})
+    path('enquetes/<int:pk>/votar/', views.EnqueteViewSet.as_view({
+        'post': 'votar'
+    }), name='enquete-votar'),
+    
+    # Detalhes/Deletar
+    path('enquetes/<int:pk>/', views.EnqueteViewSet.as_view({
+        'get': 'retrieve',
+        'delete': 'destroy'
+    }), name='enquete-detail'),
 ]

@@ -44,7 +44,7 @@ class Community(models.Model):
         verbose_name_plural = 'Comunidades'
     
     def __str__(self):
-        return f"Comunidade: {self.nome} - Lojista: {self.lojista.user.company_name}"
+        return f"Comunidade: {self.nome} - Lojista: {self.lojista.company_name}"
     
     @property
     def numero_de_seguidores(self):
