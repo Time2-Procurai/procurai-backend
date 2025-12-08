@@ -55,7 +55,18 @@ class Publicacao(models.Model):
     comunidade = models.ForeignKey(
         Community,
         on_delete=models.CASCADE,
-        related_name='publicacoes'
+        related_name='publicacoes',
+        # A adição de null=True e de blank=True permite publicações para comunidade do cliente
+        null=True, 
+        blank=True
+    )
+
+    comunidade_cliente = models.ForeignKey(
+        'customer_community.ClienteCommunity',
+        on_delete=models.CASCADE,
+        related_name='publicacoes',
+        null=True,
+        blank=True
     )
 
     autor = models.ForeignKey(
@@ -80,6 +91,22 @@ class Publicacao(models.Model):
 
     def __str__(self):
         return self.titulo or f"Publicação de {self.autor.username}"
+    
+    # Validação para garrantir a integridade do modelo
+    def clean(self):
+        # A comunidade tem que ser ou da lojista ou do cliente, nunca ambas ou nenhuma
+        if not self.comunidade and not self.comunidade_cliente:
+            raise ValidationError("A publicação deve pertencer a uma comunidade de lojista ou de cliente.")
+        
+        # Garante que não tem dois donos ao mesmo tempo
+        if self.comunidade and self.comunidade_cliente:
+            raise ValidationError("A publicação não pode pertencer a duas comunidades ao mesmo tempo.")
+        
+    def save(self, *args, **kwargs):
+        # Executa a validação antes de salvar
+        self.clean()
+        super().save(*args, **kwargs)
+        
 
 class Curtida(models.Model):
     publicacao = models.ForeignKey(
@@ -124,8 +151,20 @@ class Enquete(models.Model):
     comunidade = models.ForeignKey(
         'Community', 
         on_delete=models.CASCADE,
-        related_name='enquetes'
+        related_name='enquetes',
+        null=True,
+        blank=True
     )
+
+    # Enquete para comunidade do cliente
+    comunidade_cliente = models.ForeignKey(
+        'customer_community.ClienteCommunity',
+        on_delete=models.CASCADE,
+        related_name='enquetes',
+        null=True,
+        blank=True
+    )
+
     autor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -148,6 +187,18 @@ class Enquete(models.Model):
 
     def __str__(self):
         return f"Enquete: {self.pergunta}"
+    
+    def clean(self):
+        # Mesma lógica da publicação, agora para a Enquete
+        if not self.comunidade and not self.comunidade_cliente:
+            raise ValidationError("A enquete deve pertencer a uma comunidade de lojista ou de cliente.")
+        
+        if self.comunidade and self.comunidade_cliente:
+            raise ValidationError("A enquete não pode pertencer a duas comunidades ao mesmo tempo.")
+        
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
     @property
     def is_ativa(self):

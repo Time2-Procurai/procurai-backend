@@ -29,7 +29,7 @@ from apps.community.serializers.enquete_serializer import (
     CriarEnqueteSerializer, 
     VotoEnqueteSerializer
 )
-
+from apps.customer_community.models import ClienteCommunity
 
 class PublicacaoDetailView(generics.RetrieveAPIView):
     """
@@ -187,27 +187,46 @@ class PublicacaoCreateView(generics.CreateAPIView):
     parser_classes = (MultiPartParser, FormParser) # Permite upload de imagens
 
     def perform_create(self, serializer):
-        # Apenas lojistas podem criar publicação
-        if not self.request.user.is_lojista:
-            raise PermissionDenied("Apenas lojistas podem criar publicações.")
+        user = self.request.user
+        
+        # Tenta pegar o ID da comunidade de cliente vindo do corpo da requisição
+        comunidade_cliente_id = self.request.data.get('comunidade_cliente')
 
-        # Obtém o perfil do lojista
-        lojista_profile = get_object_or_404(LojistaProfile, user=self.request.user)
+        # --- CAMINHO 1: Post em Comunidade de Cliente ---
+        if comunidade_cliente_id:
+            # Busca a comunidade (404 se não achar)
+            cliente_community = get_object_or_404(ClienteCommunity, id=comunidade_cliente_id)
+            
+            # Salva vinculando APENAS à comunidade do cliente
+            # Passamos comunidade=None para o método clean() do model não reclamar
+            serializer.save(
+                autor=user,
+                comunidade_cliente=cliente_community,
+                comunidade=None 
+            )
 
-        # AUTO-REPAIR: Garante que a comunidade existe antes de postar
-        comunidade, created = Community.objects.get_or_create(
-            lojista=lojista_profile,
-            defaults={
-                'nome': f"Comunidade {lojista_profile.company_name}",
-                'descricao': f"Bem-vindo à comunidade oficial da {lojista_profile.company_name}!"
-            }
-        )
+        # --- CAMINHO 2: Post Oficial de Loja (Lógica Antiga) ---
+        else:
+            if not user.is_lojista:
+                raise PermissionDenied("Apenas lojistas podem criar publicações oficiais (sem comunidade de cliente).")
 
-        # Salva a publicação vinculada ao autor e à comunidade
-        serializer.save(
-            autor=self.request.user, 
-            comunidade=lojista_profile.community
-        )
+            lojista_profile = get_object_or_404(LojistaProfile, user=user)
+
+            # Auto-repair da comunidade da loja
+            comunidade, created = Community.objects.get_or_create(
+                lojista=lojista_profile,
+                defaults={
+                    'nome': f"Comunidade {lojista_profile.company_name}",
+                    'descricao': f"Bem-vindo à comunidade oficial da {lojista_profile.company_name}!"
+                }
+            )
+
+            # Salva vinculando APENAS à comunidade da loja
+            serializer.save(
+                autor=user, 
+                comunidade=comunidade,
+                comunidade_cliente=None
+            )
 
 class PublicacaoListView(generics.ListAPIView):
     serializer_class = PublicacaoSerializer
@@ -346,7 +365,8 @@ class EnqueteViewSet(viewsets.ModelViewSet):
     """
     queryset = Enquete.objects.all().prefetch_related('opcoes').order_by('-criada_em')
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['comunidade'] 
+    # Adicione 'comunidade_cliente' nos filtros para facilitar no front
+    filterset_fields = ['comunidade', 'comunidade_cliente'] 
 
     def get_permissions(self):
         if self.action in ['create', 'destroy', 'update', 'partial_update']:
@@ -364,36 +384,49 @@ class EnqueteViewSet(viewsets.ModelViewSet):
         return EnqueteSerializer
 
     def perform_create(self, serializer):
-        # Injeta a comunidade e o autor
         user = self.request.user
-        if not user.is_lojista:
-            raise PermissionDenied("Apenas lojistas podem criar enquetes.")
         
-        # Busca a comunidade do lojista logado
-        lojista = get_object_or_404(LojistaProfile, user=user)
-        
-        # --- PROTEÇÃO ROBUSTA: Garante que a comunidade existe ---
-        try:
-            comunidade = lojista.community
-        except Community.DoesNotExist:
-            # Se não existir (loja antiga), cria agora para não dar erro 500
-            comunidade = Community.objects.create(
-                lojista=lojista,
-                nome=f"Comunidade {lojista.company_name}",
-                descricao=f"Bem-vindo à comunidade oficial da {lojista.company_name}!"
+        # Verifica se veio o ID da comunidade de cliente
+        comunidade_cliente_id = self.request.data.get('comunidade_cliente')
+
+        # --- CAMINHO 1: Enquete de Cliente ---
+        if comunidade_cliente_id:
+            cliente_community = get_object_or_404(ClienteCommunity, id=comunidade_cliente_id)
+            
+            serializer.save(
+                autor=user,
+                comunidade_cliente=cliente_community,
+                comunidade=None
             )
-        
-        # Salva passando a comunidade encontrada/criada
-        serializer.save(autor=user, comunidade=comunidade)
+
+        # --- CAMINHO 2: Enquete de Loja ---
+        else:
+            if not user.is_lojista:
+                raise PermissionDenied("Apenas lojistas podem criar enquetes oficiais.")
+            
+            lojista = get_object_or_404(LojistaProfile, user=user)
+            
+            # Auto-repair
+            try:
+                comunidade = lojista.community
+            except Community.DoesNotExist:
+                comunidade = Community.objects.create(
+                    lojista=lojista,
+                    nome=f"Comunidade {lojista.company_name}",
+                    descricao=f"Bem-vindo à comunidade oficial da {lojista.company_name}!"
+                )
+            
+            serializer.save(
+                autor=user, 
+                comunidade=comunidade, 
+                comunidade_cliente=None
+            )
 
     def create(self, request, *args, **kwargs):
         # Override para retornar a enquete formatada após criar
         serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         
-        # --- CORREÇÃO AQUI ---
-        # Chamamos perform_create EXPLICITAMENTE para injetar a comunidade.
-        # (Antes estava chamando serializer.save() direto, o que pulava a injeção)
         self.perform_create(serializer)
         
         enquete = serializer.instance
@@ -408,6 +441,5 @@ class EnqueteViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response({"message": "Voto computado!"}, status=status.HTTP_201_CREATED)
-
 
 
