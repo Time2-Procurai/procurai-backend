@@ -29,6 +29,7 @@ urlpatterns = [
     path('user/', include('apps.user.urls', namespace='user')),
     path('api/community/', include('apps.community.urls')),
     path('api/notifications/', include('apps.notifications.urls')),
+    path('api/customer-community/', include('apps.customer_community.urls')),
 ]
 
 if settings.DEBUG:

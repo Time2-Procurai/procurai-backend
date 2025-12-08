@@ -91,7 +91,8 @@ class PublicacaoSerializer(serializers.ModelSerializer):
         model = Publicacao
         fields = [
             'id',
-            'comunidade_id',
+            'comunidade_id', # ID da comunidade Lojista
+            'comunidade_cliente', # ID da comunidade Cliente
             'autor',
             'autor_email',
             'titulo',
@@ -99,13 +100,14 @@ class PublicacaoSerializer(serializers.ModelSerializer):
             'imagem',
             'data_publicacao',
             'likes',
-            'user_has_liked',   # <== AGORA é válido
+            'user_has_liked', 
         ]
         read_only_fields = [
             'id',
             'autor',
             'data_publicacao',
             'comunidade_id',
+            'comunidade_cliente',
         ]
 
     def get_likes(self, obj):

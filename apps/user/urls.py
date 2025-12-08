@@ -43,7 +43,5 @@ urlpatterns = [
     path('password-reset/validate/', PasswordResetValidateCodeView.as_view(), name='password-reset-validate'),
 
     path("password-reset/confirm/", PasswordResetConfirmView1.as_view(), name="password-reset-confirm"),
-
-
 ]
 

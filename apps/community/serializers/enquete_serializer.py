@@ -23,6 +23,7 @@ class EnqueteSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'comunidade',
+            'comunidade_cliente',
             'autor',
             'autor_nome',
             'pergunta',
@@ -48,8 +49,8 @@ class CriarEnqueteSerializer(serializers.ModelSerializer):
     data_criacao = serializers.DateTimeField(source='criada_em', read_only=True)
     class Meta:
         model = Enquete
-        fields = ['comunidade', 'pergunta', 'opcoes', 'data_fim','data_criacao']
-        read_only_fields = ['comunidade']
+        fields = ['comunidade', 'comunidade_cliente', 'pergunta', 'opcoes', 'data_fim','data_criacao']
+        read_only_fields = ['comunidade', 'comunidade_cliente']
 
     def create(self, validated_data):
         opcoes_texto = validated_data.pop('opcoes')
