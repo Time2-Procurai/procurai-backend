@@ -31,14 +31,21 @@ from apps.community.serializers.enquete_serializer import (
 )
 from apps.customer_community.models import ClienteCommunity
 
-class PublicacaoDetailView(generics.RetrieveAPIView):
+class PublicacaoDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
-    Retorna os detalhes de uma publicação específica.
-    GET /api/community/publicacoes/<int:pk>/
+    Lida com GET (detalhes), PUT/PATCH (edição) e DELETE (exclusão) 
+    de uma publicação específica.
     """
     queryset = Publicacao.objects.all()
     serializer_class = PublicacaoSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated] # Ou sua permissão customizada IsOwner
+
+    # Opcional: Garantir que só o dono apague
+    def perform_destroy(self, instance):
+        if instance.autor != self.request.user:
+             from rest_framework.exceptions import PermissionDenied
+             raise PermissionDenied("Você não pode excluir o post de outra pessoa.")
+        instance.delete()
 
 class CommunityDetailView(generics.RetrieveAPIView):
     """
@@ -237,7 +244,7 @@ class PublicacaoListView(generics.ListAPIView):
         queryset = Publicacao.objects.all().order_by('-data_publicacao')
 
         # --- 1. FILTRO DE ESCOPO (Resolve o conflito de IDs) ---
-        
+        parser_classes = (MultiPartParser, FormParser)
         # Tenta pegar ID da comunidade CLIENTE
         comunidade_cliente_id = self.request.query_params.get('comunidade_cliente')
         

@@ -8,7 +8,8 @@ from .views import (
     ComentarPublicacaoView,
     ListarComentariosView,
     EnqueteViewSet,
-    FollowToggleView
+    FollowToggleView,
+    PublicacaoDetailView,
 )
 app_name = 'community'
 router = DefaultRouter()
@@ -39,7 +40,7 @@ urlpatterns = [
     # Outras rotas
     path('sugeridas/', views.SuggestedCommunitiesView.as_view(), name='community-suggested'),
     path('following/', views.UserFollowingListView.as_view(), name='community-following'),
-    
+    path('publicacoes/<int:pk>/', PublicacaoDetailView.as_view(), name='publicacao-detail'),
     # --- ROTAS PARA ENQUETES ---
     # Listar e Criar (POST envia {pergunta, opcoes: []})
     path('enquetes/', views.EnqueteViewSet.as_view({
