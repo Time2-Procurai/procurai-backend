@@ -12,7 +12,7 @@ from apps.community.serializers.community_serializer import (
     CommunityFollowSerializer,
     CommunityFollowerSerializer,
     CommunityFeedSerializer,
-    PublicacaoSerializer 
+    #PublicacaoSerializer 
     
 )
 from rest_framework.exceptions import PermissionDenied

@@ -86,7 +86,7 @@ class PublicacaoSerializer(serializers.ModelSerializer):
     # Campos calculados
     likes = serializers.SerializerMethodField()
     user_has_liked = serializers.SerializerMethodField()
-
+    total_comentarios = serializers.SerializerMethodField() # <--- O CAMPO QUE FALTAVA
     class Meta:
         model = Publicacao
         fields = [
@@ -101,6 +101,7 @@ class PublicacaoSerializer(serializers.ModelSerializer):
             'data_publicacao',
             'likes',
             'user_has_liked', 
+            'total_comentarios',
         ]
         read_only_fields = [
             'id',
@@ -126,3 +127,13 @@ class PublicacaoSerializer(serializers.ModelSerializer):
             usuario=request.user,
             user_has_liked=True
         ).exists()
+        
+    def get_total_comentarios(self, obj):
+        # Tenta pegar 'comentarios' (seu related_name).
+        # Se não achar, tenta 'comentario_set' (padrão do Django).
+        # Isso blinda o código contra erro de nome.
+        if hasattr(obj, 'comentarios'):
+            return obj.comentarios.count()
+        elif hasattr(obj, 'comentario_set'):
+            return obj.comentario_set.count()
+        return 0
