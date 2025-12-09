@@ -233,9 +233,43 @@ class PublicacaoListView(generics.ListAPIView):
     permission_classes = [permissions.AllowAny]  # Agora é público
 
     def get_queryset(self):
-        comunidade_id = self.kwargs.get('comunidade_id')
-        comunidade = get_object_or_404(Community, id=comunidade_id)
-        return comunidade.publicacoes.all()
+        # Começa com todas as publicações ordenadas
+        queryset = Publicacao.objects.all().order_by('-data_publicacao')
+
+        # --- 1. FILTRO DE ESCOPO (Resolve o conflito de IDs) ---
+        
+        # Tenta pegar ID da comunidade CLIENTE
+        comunidade_cliente_id = self.request.query_params.get('comunidade_cliente')
+        
+        # Tenta pegar ID da comunidade LOJISTA
+        comunidade_id = self.kwargs.get('comunidade_id') or self.request.query_params.get('comunidade')
+
+        if comunidade_cliente_id:
+            # Traz posts da comunidade de cliente E garante que não pertence a loja
+            queryset = queryset.filter(
+                comunidade_cliente_id=comunidade_cliente_id,
+                comunidade__isnull=True 
+            )
+        elif comunidade_id:
+            # Traz posts da comunidade de loja E garante que não pertence a cliente
+            queryset = queryset.filter(
+                comunidade_id=comunidade_id,
+                comunidade_cliente__isnull=True
+            )
+        else:
+            # Se não informou nenhuma comunidade, não retorna nada (segurança)
+            return Publicacao.objects.none()
+
+        # --- 2. FILTRO DE ROLE DO AUTOR (Novo) ---
+        # Front chama: /api/.../?role=lojista  OU  /api/.../?role=cliente
+        role = self.request.query_params.get('role')
+
+        if role == 'lojista':
+            queryset = queryset.filter(autor__is_lojista=True)
+        elif role == 'cliente':
+            queryset = queryset.filter(autor__is_lojista=False)
+
+        return queryset
 
 class CurtirPublicacaoView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -363,10 +397,28 @@ class EnqueteViewSet(viewsets.ModelViewSet):
     """
     Gerencia Listagem, Criação, Detalhes e Votação de Enquetes.
     """
-    queryset = Enquete.objects.all().prefetch_related('opcoes').order_by('-criada_em')
+    serializer_class = EnqueteSerializer
+    # filter_backends e filterset_fields são úteis, mas vamos garantir no get_queryset
     filter_backends = [DjangoFilterBackend]
-    # Adicione 'comunidade_cliente' nos filtros para facilitar no front
-    filterset_fields = ['comunidade', 'comunidade_cliente'] 
+    filterset_fields = ['comunidade', 'comunidade_cliente']
+
+    def get_queryset(self):
+        # CORREÇÃO AQUI: Mudado de '-data_criacao' para '-criada_em'
+        # Isso alinha com o campo que o erro mostrou estar disponível no seu model.
+        queryset = Enquete.objects.all().prefetch_related('opcoes').order_by('-criada_em')
+
+        # 2. Captura os parâmetros da URL
+        comunidade_cliente_id = self.request.query_params.get('comunidade_cliente')
+        comunidade_id = self.request.query_params.get('comunidade')
+
+        # 3. Filtro Manual
+        if comunidade_cliente_id:
+            return queryset.filter(comunidade_cliente_id=comunidade_cliente_id)
+        
+        if comunidade_id:
+            return queryset.filter(comunidade_id=comunidade_id)
+
+        return queryset
 
     def get_permissions(self):
         if self.action in ['create', 'destroy', 'update', 'partial_update']:
@@ -391,8 +443,13 @@ class EnqueteViewSet(viewsets.ModelViewSet):
 
         # --- CAMINHO 1: Enquete de Cliente ---
         if comunidade_cliente_id:
+            # Garante que a comunidade existe antes de salvar
             cliente_community = get_object_or_404(ClienteCommunity, id=comunidade_cliente_id)
             
+            # Opcional: Verificar se o user é o dono da comunidade
+            # if cliente_community.criador != user:
+            #    raise PermissionDenied("Você não tem permissão para criar enquete nesta comunidade.")
+
             serializer.save(
                 autor=user,
                 comunidade_cliente=cliente_community,
@@ -401,15 +458,16 @@ class EnqueteViewSet(viewsets.ModelViewSet):
 
         # --- CAMINHO 2: Enquete de Loja ---
         else:
-            if not user.is_lojista:
+            if not getattr(user, 'is_lojista', False):
                 raise PermissionDenied("Apenas lojistas podem criar enquetes oficiais.")
             
+            # Busca o perfil de lojista
             lojista = get_object_or_404(LojistaProfile, user=user)
             
-            # Auto-repair
+            # Lógica de auto-repair para garantir que a comunidade existe
             try:
                 comunidade = lojista.community
-            except Community.DoesNotExist:
+            except Community.DoesNotExist: # Ajuste para a Exception correta do seu model
                 comunidade = Community.objects.create(
                     lojista=lojista,
                     nome=f"Comunidade {lojista.company_name}",
@@ -431,15 +489,17 @@ class EnqueteViewSet(viewsets.ModelViewSet):
         
         enquete = serializer.instance
         
-        # Retorna usando o serializer de leitura (com IDs e votos)
-        read_serializer = EnqueteSerializer(enquete)
+        # Retorna usando o serializer de leitura (com IDs e votos) para o Front renderizar na hora
+        read_serializer = EnqueteSerializer(enquete, context={'request': request})
         return Response(read_serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'])
     def votar(self, request, pk=None):
-        serializer = VotoEnqueteSerializer(data=request.data, context={'request': request})
+        # Passar o objeto 'enquete' no context ou save pode ajudar na validação
+        enquete = self.get_object()
+        serializer = VotoEnqueteSerializer(data=request.data, context={'request': request, 'enquete': enquete})
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        serializer.save(enquete=enquete, usuario=request.user) # Garante vinculo
         return Response({"message": "Voto computado!"}, status=status.HTTP_201_CREATED)
 
 

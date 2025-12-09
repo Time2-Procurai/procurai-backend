@@ -4,7 +4,7 @@ from ..models import ClienteCommunity
 class ClienteCommunitySerializer(serializers.ModelSerializer):
     criador_nome = serializers.ReadOnlyField(source='criador.username')
     is_criador = serializers.SerializerMethodField()
-
+    criador_foto = serializers.ImageField(source='criador.profile_picture', read_only=True)
     class Meta:
         model = ClienteCommunity
         fields = [
@@ -17,7 +17,8 @@ class ClienteCommunitySerializer(serializers.ModelSerializer):
             'criador_nome',
             'is_criador',
             'criada_em',
-            'seguidores' # Retorna lista de IDs. Para contagem, use count no frontend ou campo calculado.
+            'seguidores',
+            'criador_foto'# Retorna lista de IDs. Para contagem, use count no frontend ou campo calculado.
         ]
         read_only_fields = ('id', 'criador', 'criada_em', 'seguidores')
 
