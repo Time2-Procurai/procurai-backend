@@ -58,6 +58,7 @@ class Product(models.Model):
         related_name='products',
         verbose_name='Proprietário do Produto',
     )
+    view_count = models.IntegerField(default=0, verbose_name='Contador de Visualizações')
 
     def save(self, *args, **kwargs):
         # Detectar se é edição

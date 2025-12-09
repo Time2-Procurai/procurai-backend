@@ -11,6 +11,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from apps.products.models import Product, Favorite
 from apps.products.serializers.favorite import FavoriteSerializer
 from django.shortcuts import get_object_or_404
+from django.db.models import F
 
 "Inserindo permissões para lojistas autenticados"
 class IsLojistaOrReadOnly(permissions.BasePermission):
@@ -63,6 +64,7 @@ class ProductViewSet(generics.ListCreateAPIView, generics.RetrieveUpdateAPIView)
         Se não, chama a lógica de 'list' (lista).
         """
         if 'pk' in kwargs:
+            Product.objects.filter(pk=kwargs['pk']).update(view_count=F('view_count') + 1)
             return self.retrieve(request, *args, **kwargs)
         
         return self.list(request, *args, **kwargs)
