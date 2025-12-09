@@ -152,7 +152,19 @@ class LojistaProfileDataSerializer(serializers.ModelSerializer):
     class Meta:
         model = LojistaProfile
         fields = '__all__' # Pega todos os campos (incluindo a foto)
-        read_only_fields = ['user']
+        read_only_fields = ('id', 'email')
+    
+    def update(self, instance, validated_data):
+        profile_picture_file = validated_data.get('profile_picture', None)
+        
+        if profile_picture_file:
+            instance.profile_picture = profile_picture_file
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        instance.save()
+        return instance
 
 class ClienteProfileDataSerializer(serializers.ModelSerializer):
     """
