@@ -53,8 +53,11 @@ class ProductViewSet(generics.ListCreateAPIView, generics.RetrieveUpdateAPIView)
     parser_classes = (MultiPartParser, FormParser) # (Garante que os parsers estão aqui)
 
 
-    filter_backends = [SearchFilter]
+    filter_backends = [DjangoFilterBackend, OrderingFilter, SearchFilter]
     search_fields = ['name', 'description', 'category_name']
+    filterset_fields = ['owner_id', 'category_name', 'is_promotion','view_count'] 
+    
+    ordering_fields = ['view_count', 'price', 'created_at']
     # --- AJUSTE AQUI ---
     # Adicione este método 'get'
     def get(self, request, *args, **kwargs):
@@ -70,6 +73,23 @@ class ProductViewSet(generics.ListCreateAPIView, generics.RetrieveUpdateAPIView)
         return self.list(request, *args, **kwargs)
     # --- FIM DO AJUSTE ---
 
+
+    def retrieve(self, request, *args, **kwargs):
+        # 1. Pega a instância do produto
+        instance = self.get_object()
+        
+        # 2. Incrementa o contador de forma segura usando F expressions
+        # Isso evita que duas visualizações simultâneas conflitem
+        instance.view_count = instance.view_count + 1
+        instance.save(update_fields=['view_count'])
+        
+        # 3. Recarrega o objeto para pegar o valor numérico atualizado (opcional, mas bom para retorno)
+        instance.refresh_from_db()
+
+        # 4. Retorna os dados normalmente
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+    
     def get_queryset(self):
         """
         Opcionalmente filtra produtos por categoria ou loja.
@@ -124,6 +144,56 @@ class ProductDelete(generics.DestroyAPIView):
         user = self.request.user
         return Product.objects.filter(owner_id=user)
 
+
+class ProductListCreateView(generics.ListCreateAPIView):
+    queryset = Product.objects.filter(available=True)
+    serializer_class = ProductSerializer
+    permission_classes = [IsLojistaOrReadOnly, IsOwnerOrReadOnly]
+    parser_classes = (MultiPartParser, FormParser)
+
+    # Filtros (Funcionam igual)
+    filter_backends = [DjangoFilterBackend, OrderingFilter, SearchFilter]
+    filterset_fields = ['owner_id', 'category_name', 'is_promotion'] 
+    search_fields = ['name', 'description', 'category_name']
+    ordering_fields = ['view_count', 'price', 'created_at']
+
+    def perform_create(self, serializer):
+        serializer.save(owner_id=self.request.user)
+
+# 2. VIEW PARA DETALHES (GET /products/ID/, PUT, DELETE)
+# Aqui está a mágica do contador de views
+class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Product.objects.filter(available=True)
+    serializer_class = ProductSerializer
+    permission_classes = [IsLojistaOrReadOnly, IsOwnerOrReadOnly]
+    parser_classes = (MultiPartParser, FormParser)
+
+    def retrieve(self, request, *args, **kwargs):
+        # 1. Pega o produto do banco
+        instance = self.get_object()
+        
+        # 2. Incremento Simples (Python puro)
+        # Se for None, vira 0
+        current_views = instance.view_count or 0
+        instance.view_count = current_views + 1
+        
+        # 3. Salva no Banco
+        instance.save()
+        
+        # DEBUG: Olhe no terminal do backend se aparece este print
+        print(f"PRODUTO {instance.id} - NOVA VISUALIZAÇÃO: {instance.view_count}")
+
+        # 4. Retorna os dados atualizados
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+# 3. VIEW PARA MEUS PRODUTOS (GET /products/my_products/)
+class MyProductsView(generics.ListAPIView):
+    serializer_class = ProductSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Product.objects.filter(owner_id=self.request.user)
 
 class ToggleFavoriteView(views.APIView):
     """

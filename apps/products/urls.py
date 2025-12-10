@@ -1,8 +1,18 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
+from rest_framework.routers import DefaultRouter
+from .views import ProductListCreateView, ProductDetailView, MyProductsView
+
 
 urlpatterns = [
-    path('', views.ProductViewSet.as_view(), name='product-list-create'),
+    path('', ProductListCreateView.as_view(), name='product-list-create'),
+
+    # Rota para "Meus Produtos" (Deve vir ANTES do ID para não confundir)
+    path('my_products/', MyProductsView.as_view(), name='my-products'),
+
+    # Rota para Detalhes (GET), Atualizar (PUT) e Deletar (DELETE)
+    # É AQUI QUE O CONTADOR FUNCIONA (ao acessar essa URL)
+    path('<int:pk>/', ProductDetailView.as_view(), name='product-detail'),
     path("search/", views.ProductListView.as_view(), name="product-search"),
     path("delete/<int:pk>/", views.ProductDelete.as_view(), name="product-delete"),
     path("<int:pk>/", views.ProductViewSet.as_view(), name="product-detail"), # pode ser removida

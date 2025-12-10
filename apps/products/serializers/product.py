@@ -9,7 +9,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'id', 'name', 'description', 'price', 'is_promotion', 'old_price', 'is_negotiable',
             'category_name', 'is_service', 
             'product_image', 
-            'available', 'owner_id', 'created_at', 'updated_at'
+            'available', 'owner_id', 'created_at', 'updated_at','view_count'
         ]
         
        
